@@ -13,20 +13,105 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- 문서 형식이 정확하면 숫자로 된 content URI도 연결 앱으로 받는다. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/x-hwp" />
                 <data android:mimeType="application/haansofthwp" />
+                <data android:mimeType="application/vnd.hancom.hwp" />
+                <data android:mimeType="application/hwp" />
                 <data android:mimeType="application/hwp+zip" />
                 <data android:mimeType="application/vnd.hancom.hwpx" />
+                <data android:mimeType="application/x-hwpx" />
+                <data android:mimeType="application/haansofthwpx" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/x-hwp" />
+                <data android:mimeType="application/haansofthwp" />
+                <data android:mimeType="application/vnd.hancom.hwp" />
+                <data android:mimeType="application/hwp" />
                 <data android:mimeType="application/hwp+zip" />
                 <data android:mimeType="application/vnd.hancom.hwpx" />
+                <data android:mimeType="application/x-hwpx" />
+                <data android:mimeType="application/haansofthwpx" />
+            </intent-filter>
+            <!-- 일반 MIME 또는 형식 누락은 URI 경로가 한글 확장자로 끝날 때만 받는다.
+                 API 31 이상은 pathSuffix가 점 개수와 관계없이 처리한다.
+                 Android 11용 pathPattern도 함께 둬 구버전에서 경로 제한이 사라지지 않게 한다.
+                 구버전 단순 패턴은 역추적하지 않아 점 1~6개인 경로를 각각 등록한다. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:host="*" />
+                <data android:mimeType="*/*" />
+                <data android:pathSuffix=".hwp" />
+                <data android:pathPattern=".*\\.hwp" />
+                <data android:pathPattern=".*\\..*\\.hwp" />
+                <data android:pathPattern=".*\\..*\\..*\\.hwp" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.hwp" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\.hwp" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\..*\\.hwp" />
+                <data android:pathSuffix=".HWP" />
+                <data android:pathPattern=".*\\.HWP" />
+                <data android:pathPattern=".*\\..*\\.HWP" />
+                <data android:pathPattern=".*\\..*\\..*\\.HWP" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.HWP" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\.HWP" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\..*\\.HWP" />
+                <data android:pathSuffix=".hwpx" />
+                <data android:pathPattern=".*\\.hwpx" />
+                <data android:pathPattern=".*\\..*\\.hwpx" />
+                <data android:pathPattern=".*\\..*\\..*\\.hwpx" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.hwpx" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\.hwpx" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\..*\\.hwpx" />
+                <data android:pathSuffix=".HWPX" />
+                <data android:pathPattern=".*\\.HWPX" />
+                <data android:pathPattern=".*\\..*\\.HWPX" />
+                <data android:pathPattern=".*\\..*\\..*\\.HWPX" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.HWPX" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\.HWPX" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\..*\\.HWPX" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:host="*" />
+                <data android:pathSuffix=".hwp" />
+                <data android:pathPattern=".*\\.hwp" />
+                <data android:pathPattern=".*\\..*\\.hwp" />
+                <data android:pathPattern=".*\\..*\\..*\\.hwp" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.hwp" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\.hwp" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\..*\\.hwp" />
+                <data android:pathSuffix=".HWP" />
+                <data android:pathPattern=".*\\.HWP" />
+                <data android:pathPattern=".*\\..*\\.HWP" />
+                <data android:pathPattern=".*\\..*\\..*\\.HWP" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.HWP" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\.HWP" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\..*\\.HWP" />
+                <data android:pathSuffix=".hwpx" />
+                <data android:pathPattern=".*\\.hwpx" />
+                <data android:pathPattern=".*\\..*\\.hwpx" />
+                <data android:pathPattern=".*\\..*\\..*\\.hwpx" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.hwpx" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\.hwpx" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\..*\\.hwpx" />
+                <data android:pathSuffix=".HWPX" />
+                <data android:pathPattern=".*\\.HWPX" />
+                <data android:pathPattern=".*\\..*\\.HWPX" />
+                <data android:pathPattern=".*\\..*\\..*\\.HWPX" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.HWPX" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\.HWPX" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\..*\\.HWPX" />
             </intent-filter>
         </activity>
         <!-- 앱 전용 임시 내보내기 파일만, 사용자가 공유한 대상에 한시적으로 제공한다. -->

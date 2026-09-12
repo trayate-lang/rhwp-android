@@ -41,3 +41,15 @@
 `scripts/fold-cycle-qa.mjs`는 전용 에뮬레이터에서 반복 전환과 undo/redo를 검사한다.
 `scripts/menu-touch-qa.mjs`는 입력 포커스를 준 뒤 메뉴를 실제 터치 이벤트로 연속 전환한다.
 JavaScript로 넣은 한글 문자열은 삼성 IME 조합 검사의 대체물이 아니다.
+
+## 0.1.2 파일 연결 등록 (2026-09-13)
+
+- HWP/HWPX MIME 별칭을 VIEW/SEND에 일치시켰다. 일반 MIME/형식 누락은 URI 확장자로 제한한 VIEW 필터로 보완했다.
+- Android 11·14 Robolectric: 연결 후보 6개 테스트 + 기존 파일 저장 6개 테스트, 총 12개 통과.
+- API 36 에뮬레이터 실제 PackageManager 연결 후보 10사례 통과: 한글 문서/대문자/점 7개 HWPX/형식 없는 file URI 포함. 일반 PDF·ZIP·형식 없는 숫자 URI는 제외.
+- Android Files에서 기존 합성 시험 문서 `fold-qa.hwpx`를 눌러 앱 실행 → 복구 안내 ‘나중에’ → 엔진 본문과 파일 이름, sourceFormat=hwpx, isDirty=false 확인.
+- 터미널에서 권한 없는 content URI를 직접 전달하는 검사는 Android SecurityException으로 거절됨. 실제 Files 경유 권한 전달로 다시 검사하여 성공.
+- lintDebug/testDebugUnitTest/assembleDebug/assembleRelease 통과, 개인 서명 검증 통과.
+- APK: outputs/rHWP-Fold-0.1.2.apk (Git 제외).
+- SHA-256: `8d03842f686af1c884aa57ef7d2dfc4b3baab8f6a9983aee3643b1f073205ad8`.
+- 폴드7 무선 디버깅 연결이 없어 0.1.2 실기기 설치 및 삼성 내 파일에서 ‘항상’ 선택은 미검증.

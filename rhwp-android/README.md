@@ -35,6 +35,24 @@ Docker 빌드는 필요한 공개 소스만 복사한다. 개인 키·`.git`·�
 Rust와 웹 화면은 같은 checkout에서 빌드한다. `pkg/`, `rhwp-studio/dist/`, APK는 생성물이며 Git에 넣지 않는다.
 Gradle은 이미 빌드된 `dist`를 포함하므로 웹 코드를 바꿨으면 반드시 `build-web.sh`부터 다시 실행한다.
 
+## HWP·HWPX 기본 연결 앱 (0.1.2)
+
+업데이트 APK 설치 후 삼성 ‘내 파일’에서 HWP 또는 HWPX 파일을 눌러 **rHWP Fold → 항상**을 선택한다.
+파일 종류나 전달 앱에 따라 HWP와 HWPX에서 각각 선택이 필요할 수 있다. 선택창에 ‘항상’이 없는 앱도 있다.
+이미 다른 앱으로 바로 열린다면 설정 → 애플리케이션 → 기존 앱 → 기본으로 설정 → 기본 설정 삭제 후 다시 연다.
+One UI 버전에 따라 항목 이름은 다를 수 있다. 앱이 사용자의 기본 앱 선택을 강제로 바꾸지는 않는다.
+
+MIME(파일 종류 표식)가 한글 문서이면 숫자 주소의 문서도 받는다.
+일반 ZIP/바이너리로 전달하면 URI 경로가 `.hwp`, `.hwpx` 또는 대문자 확장자로 끝날 때 후보에 표시한다.
+Android 12 이상에서는 파일 이름에 점이 여러 개 있어도 처리한다. Android 11의 일반 MIME 보완 경로는 점 6개까지 지원한다.
+형식도 일반 바이너리이고 URI에도 파일 이름이 없는 공급자는 Android가 HWP 여부를 구분할 수 없다.
+이 경우 rHWP Fold → 열기로 선택한다. 전체 파일/사진/ZIP의 기본 앱으로 등록하지 않는다.
+
+원리: [Android Intent 필터](https://developer.android.com/guide/topics/manifest/data-element).
+확장자는 연결 후보를 고르는 힌트이며 실제 문서의 유효성은 편집 엔진이 검사한다.
+한컴은 HWPX 내부의 MIME을 `application/hwp+zip`으로 설명한다
+([한컴 개발자 포럼](https://forum.developer.hancom.com/t/hwp-hwpx-mime-type-whitelist/1641)).
+
 ## 개인 설치와 업데이트
 
 ```bash
