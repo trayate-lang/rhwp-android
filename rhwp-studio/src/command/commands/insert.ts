@@ -16,6 +16,7 @@ import type { WasmBridge } from '@/core/wasm-bridge';
 import type { InputHandler } from '@/engine/input-handler';
 import { SetObjectPropsCommand, SetZOrderCommand, type RefreshPolicy } from '@/engine/command';
 import { getObjectProps, setObjectProps, type ObjectPropsRef } from '@/engine/object-props';
+import { AutotextDialog } from '@/ui/autotext-dialog';
 
 /** 스텁 커맨드 생성 헬퍼 */
 function stub(id: string, label: string, icon?: string, shortcut?: string): CommandDef {
@@ -95,6 +96,17 @@ function insertNote(
 }
 
 export const insertCommands: CommandDef[] = [
+  // 단축키와 터치 메뉴가 같은 명령을 공유하여 기능 차이를 만들지 않는다.
+  {
+    id: 'insert:autotext', label: '상용구 등록/실행', shortcutLabel: 'Alt+I', opensDialog: true,
+    canExecute: ctx => ctx.hasDocument && ctx.isEditable && !ctx.isFormMode,
+    execute: services => new AutotextDialog(services).show(),
+  },
+  {
+    id: 'insert:autotext-list', label: '상용구 내용', shortcutLabel: 'Ctrl+F3', opensDialog: true,
+    canExecute: ctx => ctx.hasDocument && ctx.isEditable && !ctx.isFormMode,
+    execute: services => new AutotextDialog(services).show('list'),
+  },
   {
     id: 'insert:shape',
     label: '도형',

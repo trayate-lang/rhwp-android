@@ -1066,7 +1066,8 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
   }
 
   // ─── F3 선택 영역 확장 (#220) ──────────────────────────
-  if (e.key === 'F3') {
+  // Ctrl+F3 상용구 목록은 아래 공통 단축키 경로로 넘긴다.
+  if (e.key === 'F3' && !e.ctrlKey && !e.metaKey && !e.altKey) {
     e.preventDefault();
     if (!this.cursor.isInBlockSelectionMode()) {
       this.cursor.enterBlockSelectionMode();
@@ -1204,6 +1205,12 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
     // 수정자 키만 누른 경우 무시
     if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') return;
     // 그 외 키 → 표 객체 선택 해제 후 기본 키 처리
+    // Alt+i는 선택한 표 자체를 등록하므로 선택 해제 전에 실행해야 한다.
+    if (matchShortcut(e, defaultShortcuts) === 'insert:autotext') {
+      e.preventDefault();
+      this.dispatcher?.dispatch('insert:autotext');
+      return;
+    }
     this.cursor.exitTableObjectSelection();
     this.eventBus.emit('table-object-selection-changed', false);
     // fall through
@@ -1877,7 +1884,7 @@ export function onCut(this: any, e: ClipboardEvent): void {
   this.deleteSelection();
 }
 
-export function onPaste(this: any, e: ClipboardEvent): void {
+export function onPaste(this: any, e: ClipboardEvent, forceExternal = false): void {
   if (!this.active) return;
   e.preventDefault();
   if (this.isFormMode?.()) return;
@@ -1918,7 +1925,7 @@ export function onPaste(this: any, e: ClipboardEvent): void {
     !!internalClipboardText &&
     text === internalClipboardText;
   const useInternalClipboard =
-    this.wasm.hasInternalClipboard() &&
+    !forceExternal && this.wasm.hasInternalClipboard() &&
     (!clipboardData || hasCurrentInternalMarker || hasMatchingInternalControlText);
 
   // 내부 복사 marker가 있으면 내부 클립보드를 사용한다.
@@ -1992,6 +1999,36 @@ export function onPaste(this: any, e: ClipboardEvent): void {
 
   // 외부 클립보드: HTML이 있으면 pasteHtml로 표/서식 보존 붙여넣기
   if (html) {
+    // 상용구의 단독 그림은 원본 HTML 붙이기가 누락하므로 기존 그림 삽입 API를 쓴다.
+    // 혼합 본문의 그림을 조용히 잃는 대신 시험판 지원 범위를 명확히 알린다.
+    if (forceExternal) {
+      const document = new DOMParser().parseFromString(html, 'text/html');
+      const images = Array.from(document.querySelectorAll('img')).filter(image => !image.closest('table'));
+      if (images.length) {
+        if (pos.parentParaIndex !== undefined) throw new Error('시험판의 단독 그림 상용구는 본문에 넣어 주세요.');
+        if (images.length !== 1 || document.body.textContent?.trim() || document.querySelector('table')) {
+          throw new Error('시험판은 본문 글자와 그림의 혼합 삽입을 지원하지 않습니다. 그림을 따로 등록해 주세요.');
+        }
+        const image = images[0];
+        const match = /^data:image\/(png|jpeg|gif|bmp|webp);base64,([A-Za-z0-9+/=\s]+)$/.exec(image.getAttribute('src') || '');
+        if (!match) throw new Error('상용구에 오프라인 그림 데이터가 없습니다.');
+        const data = Uint8Array.from(atob(match[2]), character => character.charCodeAt(0));
+        const width = Number(image.getAttribute('width'));
+        const height = Number(image.getAttribute('height'));
+        if (!(width > 0 && height > 0)) throw new Error('그림 크기를 읽지 못했습니다.');
+        this.executeOperation({ kind: 'snapshot', operationType: 'insertAutotextImage', operation: (wasm: WasmBridge) => {
+          if (hasSelection) this.deleteSelection({ deferRecord: true });
+          const p = this.cursor.getPosition();
+          const result = wasm.insertPicture(p.sectionIndex, p.parentParaIndex ?? p.paragraphIndex,
+            p.charOffset, p.cellPath?.length ? JSON.stringify(p.cellPath) : '', data,
+            Math.round(width * 75), Math.round(height * 75), width, height, match[1], '');
+          if (!result.ok) throw new Error('그림 상용구를 삽입하지 못했습니다.');
+          // 그림은 현재 문단에 붙으며 다음 문단이 생긴다고 가정할 수 없다.
+          return { ...p, paragraphIndex: result.paraIdx, charOffset: result.logicalOffset ?? p.charOffset };
+        }});
+        return;
+      }
+    }
     this.executeOperation({ kind: 'snapshot', operationType: 'pasteHtml', operation: (wasm: WasmBridge) => {
       if (hasSelection) this.deleteSelection({ deferRecord: true });
       const p = this.cursor.getPosition();
@@ -2012,11 +2049,27 @@ export function onPaste(this: any, e: ClipboardEvent): void {
       if (parsed.ok) {
         return positionAfterPasteResult(p, parsed);
       }
+      if (forceExternal) throw new Error('상용구 내용을 삽입하지 못했습니다.');
       return p;
     }});
     return;
   }
 
+  // 영구 상용구 치환은 준말 삭제부터 여러 줄 삽입까지 하나의 스냅샷으로 기록한다.
+  // 일반 타이핑과 병합하면 Ctrl+Z가 준말까지 지워 버리므로 별도 경계가 필요하다.
+  if (forceExternal && text) {
+    this.executeOperation({ kind: 'snapshot', operationType: 'insertAutotext', operation: (wasm: WasmBridge) => {
+      if (hasSelection) this.deleteSelection({ deferRecord: true });
+      let next = this.cursor.getPosition();
+      const lines = text.split(/\r?\n/);
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i]) next = new InsertTextCommand(next, lines[i]).execute(wasm);
+        if (i < lines.length - 1) next = new SplitParagraphCommand(next).execute(wasm);
+      }
+      return next;
+    }});
+    return;
+  }
   // 플레인 텍스트 붙여넣기 (fallback — 기존 InsertTextCommand 사용, 정밀 undo 유지)
   pastePlainText.call(this, text, hasSelection);
 }

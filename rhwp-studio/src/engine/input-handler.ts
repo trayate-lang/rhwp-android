@@ -4207,6 +4207,14 @@ export class InputHandler {
     this.caret.hide();
     this.fieldMarker.hide();
     this.cursor.clearSelection();
+    // 새 문서에는 이전 문서의 표/그림 선택을 넘기지 않는다. 남아 있으면
+    // Alt+i가 준말 실행 대신 사라진 개체 등록을 시도하게 된다.
+    this.cursor.exitTableObjectSelection();
+    this.cursor.exitPictureObjectSelection();
+    this.tableObjectRenderer?.clear();
+    this.pictureObjectRenderer?.clear();
+    this.eventBus.emit('table-object-selection-changed', false);
+    this.eventBus.emit('picture-object-selection-changed', false);
     this.selectionRenderer.clear();
     this.history.clear(this.wasm);
   }
@@ -5266,7 +5274,90 @@ export class InputHandler {
     document.execCommand('copy');
   }
 
-  /** 붙이기 (커맨드 시스템용 — 컨텍스트 메뉴/도구 상자에서 호출) */
+  /** UI에 필요한 상용구 상태만 노출하여 내부 커서 구현을 대화상자와 분리한다. */
+  getAutotextContext(): { selected: boolean; prefix: string } {
+    const pos = this.cursor.getPosition();
+    const selected = this.cursor.hasSelection() || this.cursor.isInTableObjectSelection() || this.cursor.isInPictureObjectSelection();
+    return {
+      selected,
+      prefix: !selected && pos.parentParaIndex === undefined && !this.cursor.isInHeaderFooter() && !this.cursor.isInFootnote()
+        ? this.wasm.getTextRange(pos.sectionIndex, pos.paragraphIndex, 0, pos.charOffset) : '',
+    };
+  }
+
+  /** 선택 내용만 저장용으로 추출한다. 전체 문서나 시스템 클립보드는 저장하지 않는다. */
+  captureAutotext(): { text: string; html: string; hasObjects: boolean } {
+    if (this.cursor.isInHeaderFooter() || this.cursor.isInFootnote() || this.cursor.isInTextBox()) {
+      throw new Error('시험판에서는 본문 또는 표의 내용을 선택해 주세요.');
+    }
+    const picture = this.cursor.getSelectedPictureRef();
+    const table = this.cursor.getSelectedTableRef();
+    let html = '';
+    if (this.cursor.isInPictureObjectSelection() && picture) {
+      if (picture.type !== 'image') throw new Error('시험판의 개체 상용구는 표와 그림부터 지원합니다.');
+      html = this.wasm.exportControlHtml(picture.sec, picture.ppi, picture.ci, _keyboard.pictureCellPathJson(picture));
+    } else if (this.cursor.isInTableObjectSelection() && table) {
+      const target = tableObjectClipboardTarget(table);
+      html = this.wasm.exportControlHtml(table.sec, table.ppi, target.controlIndex, target.ownerCellPathJson);
+    } else {
+      const selection = this.cursor.getSelectionOrdered();
+      if (!selection) throw new Error('먼저 등록할 내용을 선택해 주세요.');
+      const { start: s, end: e } = selection;
+      if (s.sectionIndex !== e.sectionIndex) throw new Error('시험판은 같은 구역 안의 선택만 지원합니다.');
+      if (s.parentParaIndex !== undefined) {
+        if (!s.cellPath?.length) throw new Error('표 선택 경로를 확인하지 못했습니다. 표 전체를 선택해 주세요.');
+        html = this.wasm.exportSelectionInCellHtmlByPath(s.sectionIndex, s.parentParaIndex,
+          JSON.stringify(s.cellPath), s.cellParaIndex!, s.charOffset, e.cellParaIndex!, e.charOffset);
+      } else {
+        html = this.wasm.exportSelectionHtml(s.sectionIndex, s.paragraphIndex, s.charOffset, e.paragraphIndex, e.charOffset);
+      }
+    }
+    if (!html) throw new Error('선택 내용을 내보내지 못했습니다.');
+    // 분리된 문서로 파싱만 한다. 저장 HTML을 실행 가능한 화면에 넣지 않는다.
+    const parsed = new DOMParser().parseFromString(html, 'text/html');
+    if (!parsed.body.textContent?.trim() && !parsed.querySelector('table,img')) {
+      throw new Error('내보낸 선택에 저장 가능한 내용이 없습니다.');
+    }
+    parsed.querySelectorAll('script, style').forEach(node => node.remove());
+    // 내보내기 HTML의 들여쓰기/개행은 문서 글자가 아니다. 최상위 공백 노드만 제거한다.
+    const walker = parsed.createTreeWalker(parsed.body, NodeFilter.SHOW_TEXT);
+    const formattingWhitespace: Node[] = [];
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      if (/^[\t \r\n]*[\r\n][\t \r\n]*$/.test(node.textContent || '')) formattingWhitespace.push(node);
+    }
+    formattingWhitespace.forEach(node => node.parentNode?.removeChild(node));
+    parsed.querySelectorAll('br').forEach(node => node.replaceWith('\n'));
+    parsed.querySelectorAll('p').forEach(node => node.append('\n'));
+    return { html, text: (parsed.body.textContent || '').replace(/\n$/, ''),
+      hasObjects: !!parsed.querySelector('table,img,svg,object') };
+  }
+
+  /** 준말 치환과 붙이기를 기존 snapshot 작업 하나에 맡겨 Ctrl+Z로 함께 되돌린다. */
+  insertAutotext(text: string, html: string, keyword = ''): void {
+    if (this.isComposing) throw new Error('한글 입력을 마친 뒤 다시 실행해 주세요.');
+    if (this.cursor.isInHeaderFooter() || this.cursor.isInFootnote() || this.cursor.isInTextBox()) {
+      throw new Error('시험판에서는 본문 또는 표 셀에 상용구를 넣어 주세요.');
+    }
+    if (keyword) {
+      const pos = this.cursor.getPosition();
+      if (pos.parentParaIndex !== undefined || this.cursor.isInHeaderFooter() || this.cursor.isInFootnote()) {
+        throw new Error('표 안에서는 상용구 내용 목록의 넣기 버튼을 사용해 주세요.');
+      }
+      const prefix = this.wasm.getTextRange(pos.sectionIndex, pos.paragraphIndex, 0, pos.charOffset);
+      if (!prefix.endsWith(keyword)) throw new Error('준말 뒤에 커서를 놓고 다시 실행해 주세요.');
+      this.cursor.clearSelection();
+      this.cursor.moveTo({ ...pos, charOffset: pos.charOffset - [...keyword].length });
+      this.cursor.setAnchor();
+      this.cursor.moveTo(pos);
+    }
+    const data = new DataTransfer();
+    data.setData('text/plain', text);
+    if (html) data.setData('text/html', html);
+    // 상용구와 일시 클립보드의 텍스트가 같아도 다른 개체를 붙이지 않도록 강제한다.
+    _keyboard.onPaste.call(this, new ClipboardEvent('paste', { clipboardData: data }), true);
+  }
+
   performPaste(): boolean {
     if (this.editMode === 'form') return false;
     this.focusTextarea();

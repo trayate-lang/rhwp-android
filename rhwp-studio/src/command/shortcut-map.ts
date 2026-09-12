@@ -81,6 +81,9 @@ export const defaultShortcuts: [ShortcutDef, string][] = [
   [{ key: 'ㅎ', alt: true }, 'edit:goto'],
 
   // 입력
+  // 한글 키보드에서 key가 모음이어도 물리 I 키로 상용구를 실행한다.
+  [{ key: 'i', code: 'KeyI', alt: true }, 'insert:autotext'],
+  [{ key: 'f3', ctrl: true }, 'insert:autotext-list'],
   [{ key: 'f10', alt: true }, 'insert:symbols'],
 
   // 쪽
