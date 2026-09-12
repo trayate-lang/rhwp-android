@@ -239,16 +239,32 @@ class MainActivity : ComponentActivity() {
         val paper = Regex("name=\"rhwp-paper-size\" content=\"([0-9.]+),([0-9.]+)\"").find(html)
         val width = paper?.groupValues?.get(1)?.toDoubleOrNull()?.takeIf { it in 25.0..2000.0 } ?: 210.0
         val height = paper?.groupValues?.get(2)?.toDoubleOrNull()?.takeIf { it in 25.0..2000.0 } ?: 297.0
+        // 시스템 PDF 프린터는 임의 ID의 용지를 지원하지 않으면 Letter로
+        // 되돌린다. 알려진 크기는 표준 ID로 전달하고 방향을 별도로 맞춘다.
+        val shortSide = minOf(width, height)
+        val longSide = maxOf(width, height)
+        val standardPaper = listOf(PrintAttributes.MediaSize.ISO_A4, PrintAttributes.MediaSize.ISO_A3,
+            PrintAttributes.MediaSize.ISO_A5, PrintAttributes.MediaSize.NA_LETTER, PrintAttributes.MediaSize.NA_LEGAL)
+            .firstOrNull { kotlin.math.abs(it.widthMils * 25.4 / 1000 - shortSide) < 1 &&
+                kotlin.math.abs(it.heightMils * 25.4 / 1000 - longSide) < 1 }
+        val media = standardPaper?.let { if (width > height) it.asLandscape() else it.asPortrait() }
+            ?: PrintAttributes.MediaSize("rhwp-document", "문서 용지", (width / 25.4 * 1000).toInt(), (height / 25.4 * 1000).toInt())
         val attributes = PrintAttributes.Builder()
-            .setMediaSize(PrintAttributes.MediaSize("rhwp-document", "문서 용지", (width / 25.4 * 1000).toInt(), (height / 25.4 * 1000).toInt()))
+            .setMediaSize(media)
             .setMinMargins(PrintAttributes.Margins.NO_MARGINS).build()
+        // HTML도 APK 자원과 같은 로컬 HTTPS 경로로 전달한다. data: 문서는
+        // 오프라인 요청 차단에 걸려 오류 페이지 자체가 PDF로 인쇄될 수 있다.
+        val printUrl = "$ORIGIN/assets/studio/android-print.html"
         view.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(v: WebView?, request: WebResourceRequest): WebResourceResponse? =
-                assets.shouldInterceptRequest(request.url) ?: WebResourceResponse("text/plain", "UTF-8", 403, "Offline only", emptyMap(), ByteArrayInputStream(ByteArray(0)))
-            override fun onPageFinished(v: WebView?, url: String?) { waitForPrintFonts(view, name, 0, attributes) }
+                if (request.url.toString() == printUrl) WebResourceResponse("text/html", "UTF-8", ByteArrayInputStream(html.toByteArray(Charsets.UTF_8)))
+                else assets.shouldInterceptRequest(request.url) ?: WebResourceResponse("text/plain", "UTF-8", 403, "Offline only", emptyMap(), ByteArrayInputStream(ByteArray(0)))
+            override fun onPageFinished(v: WebView?, url: String?) {
+                if (url == printUrl) waitForPrintFonts(view, name, 0, attributes)
+            }
         }
         // 인쇄 전용 뷰에는 문서 파일 연결부를 노출하지 않는다.
-        view.loadDataWithBaseURL("$ORIGIN/assets/studio/", html, "text/html", "UTF-8", null)
+        view.loadUrl(printUrl)
     }
 
     private fun waitForPrintFonts(view: WebView, name: String, attempts: Int, attributes: PrintAttributes) {
