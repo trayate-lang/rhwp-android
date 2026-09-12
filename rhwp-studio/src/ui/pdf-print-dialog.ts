@@ -1,5 +1,6 @@
 import { PDF_PRINT_GUIDANCE, printProgressText } from '@/command/print-pages';
 import { ModalDialog } from './dialog';
+import { getAndroidHost } from '@/platform/android-host';
 
 type PdfPrintDialogState = 'confirm' | 'preparing' | 'complete' | 'error';
 
@@ -38,8 +39,11 @@ export class PdfPrintDialog extends ModalDialog {
 
     const summary = document.createElement('p');
     summary.className = 'dialog-pdf-summary';
-    summary.textContent =
-      'rhwp는 브라우저의 인쇄 기능을 사용해 검색 가능한 PDF를 만듭니다.';
+    // 앱에서는 사용자가 실제로 보게 될 Android 인쇄 화면을 기준으로 안내한다.
+    const android = getAndroidHost() !== null;
+    summary.textContent = android
+      ? 'Android 인쇄 기능으로 문서를 인쇄하거나 PDF 파일로 저장합니다.'
+      : 'rhwp는 브라우저의 인쇄 기능을 사용해 검색 가능한 PDF를 만듭니다.';
 
     const guidance = document.createElement('div');
     guidance.className = 'dialog-pdf-guidance';
@@ -48,8 +52,9 @@ export class PdfPrintDialog extends ModalDialog {
     guidanceTitle.textContent = '저장 방법';
 
     const guidanceText = document.createElement('span');
-    guidanceText.textContent =
-      `${PDF_PRINT_GUIDANCE} 브라우저에 따라 이 항목은 ‘프린터’로 표시될 수 있습니다.`;
+    guidanceText.textContent = android
+      ? '다음 화면의 프린터 목록에서 ‘PDF로 저장’을 고르고 PDF 저장 버튼을 누르세요.'
+      : `${PDF_PRINT_GUIDANCE} 브라우저에 따라 이 항목은 ‘프린터’로 표시될 수 있습니다.`;
 
     guidance.append(guidanceTitle, guidanceText);
 

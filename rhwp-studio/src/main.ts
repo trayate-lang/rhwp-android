@@ -1,4 +1,7 @@
 import { WasmBridge } from '@/core/wasm-bridge';
+import { getAndroidHost } from '@/platform/android-host';
+import { prepareAndroidHost, installAndroidRuntime } from '@/platform/android-runtime';
+import '@/styles/android.css';
 import type { DocumentInfo, PageInfo } from '@/core/types';
 import { EventBus } from '@/core/event-bus';
 import { assertRemoteDocumentBytes } from '@/core/document-signature';
@@ -104,6 +107,8 @@ import type { EmbedRendererRuntimeRequestV1 } from '@/embed/rpc-router';
 import { enrichFontDecisionTrace } from '@/core/font-decision-trace';
 import { DocumentAgentController } from '@/document-agent/controller';
 
+// WASM 초기화 전에 파일 선택 인터페이스를 준비한다. 일반 웹에서는 아무 것도 변경하지 않는다.
+prepareAndroidHost();
 const wasm = new WasmBridge();
 const eventBus = new EventBus();
 const documentState = new DocumentDirtyState(eventBus);
@@ -388,6 +393,8 @@ let autosavePreviousMessage: string | null = null;
 
 function autosaveScheduleFromUserSettings(): AutosaveScheduleSettings {
   const settings = userSettings.getAutosaveSettings();
+  // 휴대폰은 백그라운드 종료가 잦으므로 입력이 멈춘 뒤 2초에 복구본을 남긴다.
+  if (getAndroidHost()) return { recoveryEnabled: true, recoveryIntervalMs: 60_000, idleEnabled: true, idleDelayMs: 2_000 };
   return {
     recoveryEnabled: settings.recoveryEnabled,
     recoveryIntervalMs: settings.recoveryIntervalMinutes * 60_000,
@@ -1936,6 +1943,28 @@ const initPromise = initialize();
 void initPromise.then(() => {
   if (!rendererInitialized) return;
   maybeShowSkinOnboarding();
+});
+
+installAndroidRuntime({
+  // 원본 초기화는 오류를 화면에 표시하고 resolve하므로 실제 렌더러 준비까지 확인한다.
+  ready: initPromise.then(() => { if (getAndroidHost() && !rendererInitialized) throw new Error('편집기를 초기화하지 못했습니다. 앱을 다시 실행해 주세요.'); }),
+  open: async (file, handle) => {
+    if (!await canReplaceCurrentDocument(false)) return;
+    await loadBytes(new Uint8Array(await file.arrayBuffer()), file.name, handle);
+  },
+  dispatch: id => { dispatcher.dispatch(id); },
+  checkpoint: () => autosaveManager.flushNow('android-background'),
+  mayClose: async () => { await autosaveManager.flushNow('android-back'); return await confirmSaveBeforeReplacingDocument(commandServices); },
+  exportFile: () => {
+    if (wasm.requiresPasswordForSave) throw new Error('암호 문서는 저장 기능으로 저장한 후 Android 파일 앱에서 공유해 주세요.');
+    inputHandler?.flushDeferredPaginationIfNeeded('android-share', true);
+    const hwpx = wasm.getSourceFormat() === 'hwpx';
+    const artifact = hwpx ? wasm.exportHwpxWithReport() : wasm.exportHwpWithReport();
+    // 손실이 보고된 결과를 공유창으로 곧바로 넘기지 않는다. 원본 저장 흐름에서 고지를 확인한다.
+    if (artifact.contentLoss.count > 0) throw new Error('변환 중 보존되지 않는 내용이 있습니다. 먼저 저장 메뉴에서 손실 안내를 확인해 주세요.');
+    return { bytes: artifact.bytes, name: (wasm.fileName || 'document').replace(/\.(hwp|hwpx|hml)$/i, '') + (hwpx ? '.hwpx' : '.hwp'), protected: false };
+  },
+  report: message => showToast({ message, durationMs: 5000 }),
 });
 
 installEmbedRuntime({

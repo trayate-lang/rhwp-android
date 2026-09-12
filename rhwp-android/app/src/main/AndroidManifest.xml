@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 인터넷/전체 저장소 권한 없이, 사용자가 선택한 문서만 처리한다. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:label="rHWP Fold" android:icon="@drawable/ic_launcher"
+        android:theme="@style/AppTheme" android:allowBackup="false" android:supportsRtl="true"
+        android:usesCleartextTraffic="false">
+        <!-- 크기 변화 때 WebView를 보존해 편집 기록과 한글 조합을 유지한다. -->
+        <activity android:name=".MainActivity" android:exported="true"
+            android:launchMode="singleTop" android:resizeableActivity="true"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|density|uiMode">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/x-hwp" />
+                <data android:mimeType="application/haansofthwp" />
+                <data android:mimeType="application/hwp+zip" />
+                <data android:mimeType="application/vnd.hancom.hwpx" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/x-hwp" />
+                <data android:mimeType="application/hwp+zip" />
+                <data android:mimeType="application/vnd.hancom.hwpx" />
+            </intent-filter>
+        </activity>
+        <!-- 앱 전용 임시 내보내기 파일만, 사용자가 공유한 대상에 한시적으로 제공한다. -->
+        <provider android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files" android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+</manifest>

@@ -5,6 +5,7 @@ import {
   type HtmlExportFormat,
 } from '@/command/export-html';
 import { PageSetupDialog } from '@/ui/page-setup-dialog';
+import { getAndroidHost } from '@/platform/android-host';
 import { AboutDialog } from '@/ui/about-dialog';
 import { showSaveAs } from '@/ui/save-as-dialog';
 import { showConfirm } from '@/ui/confirm-dialog';
@@ -206,6 +207,8 @@ async function tryFileSystemSave(
     });
   } catch (error) {
     if (isUserCancelError(error)) return 'cancelled';
+    // Android 저장 실패는 웹 다운로드로 우회하면 안 된다. 원본/수정/복구 상태를 보존한다.
+    if (getAndroidHost()) throw error;
     console.warn('[file:save] File System Access API 실패, 폴백:', error);
     return { method: 'fallback', handle: null, fileName: suggestedName };
   }
@@ -506,6 +509,12 @@ function setupPrintDocument(
   viewport.name = 'viewport';
   viewport.content = 'width=device-width, initial-scale=1.0';
   doc.head.append(meta, viewport);
+  // Android 인쇄 기본 용지도 문서 첫 쪽 크기로 맞춘다(단위 mm).
+  if (getAndroidHost() && printPages[0]) {
+    const paper = doc.createElement('meta'); paper.name = 'rhwp-paper-size';
+    paper.content = `${printPages[0].widthMm},${printPages[0].heightMm}`;
+    doc.head.append(paper);
+  }
   doc.title = previewWindow
     ? `${fileName} — 인쇄 미리보기`
     : pdfPrintTitle(fileName);
@@ -658,7 +667,13 @@ async function runPdfPrint(services: CommandServices): Promise<void> {
     // 사용한다. native print()가 열린 동안에만 원본 파일의 basename을 노출한다.
     originalDocumentTitle = document.title;
     document.title = pdfPrintTitle(wasm.fileName);
-    surface.window.print();
+    const android = getAndroidHost();
+    if (android) {
+      // Android WebView의 window.print() 대신 OS 인쇄/PDF 저장 화면에 전달한다.
+      await android.transfer(new Blob(['<!doctype html>' + surface.document.documentElement.outerHTML], { type: 'text/html' }), {
+        kind: 'print', name: pdfPrintTitle(wasm.fileName) + '.html',
+      });
+    } else surface.window.print();
   } catch (err) {
     restoreStatus = false;
     const msg = err instanceof Error ? err.message : String(err);
@@ -680,6 +695,8 @@ async function runPdfPrint(services: CommandServices): Promise<void> {
 }
 
 async function runPrintPreview(services: CommandServices): Promise<void> {
+  // Android는 별도 팝업 대신 동일한 렌더링 결과를 OS 인쇄 미리보기에 보낸다.
+  if (getAndroidHost()) return runPdfPrint(services);
   if (!beginPrintJob()) return;
 
   const wasm = services.wasm;

@@ -1,0 +1,7 @@
+# 원본의 rust-toolchain.toml과 같은 버전을 써서 Mac/CI의 WASM 엔진을 맞춘다.
+FROM rust:1.93.1@sha256:ecbe59a8408895edd02d9ef422504b8501dd9fa1526de27a45b73406d734d659
+RUN rustup target add wasm32-unknown-unknown \
+    && cargo install wasm-pack --version 0.15.0 --locked
+WORKDIR /app
+# 원본의 잠금 파일 보존 스크립트를 그대로 사용한다.
+CMD ["scripts/wasm-pack-locked.sh", "--target", "web", "--release"]
