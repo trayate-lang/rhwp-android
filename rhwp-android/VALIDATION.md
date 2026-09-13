@@ -53,3 +53,11 @@ JavaScript로 넣은 한글 문자열은 삼성 IME 조합 검사의 대체물�
 - APK: outputs/rHWP-Fold-0.1.2.apk (Git 제외).
 - SHA-256: `8d03842f686af1c884aa57ef7d2dfc4b3baab8f6a9983aee3643b1f073205ad8`.
 - 폴드7 무선 디버깅 연결이 없어 0.1.2 실기기 설치 및 삼성 내 파일에서 ‘항상’ 선택은 미검증.
+
+## 0.1.3 아이콘 (2026-09-13)
+
+- 남색 배경, 흰 문서, 파란 접힘, ㅎ 시안을 Android 벡터로 구현했다.
+- 적응형 배경/전경과 API 33 이상 단색 테마용 리소스를 제공한다.
+- assembleDebug/assembleRelease/lintDebug 성공. 폴드7 업데이트 설치 Success 및 versionName=0.1.3 확인.
+- 에뮬레이터는 연결되어 있지 않았다. 폴드7 화면 캡처는 알림 설정 화면이어서 아이콘 시각 검증 증거로 사용하지 않았다. 홈 화면에서 사용자의 최종 확인이 필요하다.
+- APK: outputs/rHWP-Fold-0.1.3.apk (Git 제외).
