@@ -56,6 +56,9 @@ export const defaultShortcuts: [ShortcutDef, string][] = [
 
   // 서식 – 스타일
   [{ key: 'f6' }, 'format:style-dialog'],
+  // 문서에 저장된 첫 10개 스타일을 순서대로 적용한다(0은 열 번째).
+  ...Array.from({ length: 10 }, (_, i): [ShortcutDef, string] =>
+    [{ key: String((i + 1) % 10), code: `Digit${(i + 1) % 10}`, ctrl: true }, `format:style-${i + 1}`]),
 
   // 쪽
   [{ key: 'f7' }, 'file:page-setup'],
@@ -65,7 +68,6 @@ export const defaultShortcuts: [ShortcutDef, string][] = [
   [{ key: '+', ctrl: true }, 'view:zoom-in'],
   [{ key: '+', ctrl: true, shift: true }, 'view:zoom-in'],
   [{ key: '-', ctrl: true }, 'view:zoom-out'],
-  [{ key: '0', ctrl: true }, 'view:zoom-100'],
 
   // 도구 상자 (한글 2024 호환)
   [{ key: 'f1', ctrl: true }, 'view:toolbox-basic'],
@@ -81,6 +83,9 @@ export const defaultShortcuts: [ShortcutDef, string][] = [
   [{ key: 'ㅎ', alt: true }, 'edit:goto'],
 
   // 입력
+  // 한글 키보드에서 key가 모음이어도 물리 I 키로 상용구를 실행한다.
+  [{ key: 'i', code: 'KeyI', alt: true }, 'insert:autotext'],
+  [{ key: 'f3', ctrl: true }, 'insert:autotext-list'],
   [{ key: 'f10', alt: true }, 'insert:symbols'],
 
   // 쪽
@@ -155,7 +160,10 @@ export function matchShortcut(
     if ((def.shift ?? false) !== e.shiftKey) continue;
     if ((def.alt ?? false) !== e.altKey) continue;
     if (eventKey === def.key) return cmdId;
-    if (def.code && eventCode === def.code.toLowerCase()) return cmdId;
+    // IME의 Process/한글 자모 값에서도 동일 물리 키로 찾는다. 단축키별 누락을 막는다.
+    const physicalCode = def.code ?? (/^[a-z]$/.test(def.key) ? `Key${def.key}`
+      : /^f\d+$/.test(def.key) ? def.key : undefined);
+    if (physicalCode && eventCode === physicalCode.toLowerCase()) return cmdId;
   }
   return null;
 }

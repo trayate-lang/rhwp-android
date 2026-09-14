@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 테마 아이콘에서는 시스템이 색을 입힌다. ㅎ와 접힘을 투명 구멍으로 남긴다. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFF" android:fillType="evenOdd" android:pathData="M37,24H61L78,41V76Q78,83 71,83H37Q30,83 30,76V31Q30,24 37,24Z M61,27V35Q61,41 67,41H75Z M48,42H60V46H48Z M42,48H66V52H42Z M54,54A10,9 0,1 1,54,72A10,9 0,1 1,54,54Z M54,58.5A4.5,4.5 0,1 0,54,67.5A4.5,4.5 0,1 0,54,58.5Z M40,75H68V78H40Z" />
+</vector>

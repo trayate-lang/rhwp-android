@@ -7,7 +7,9 @@ use super::super::helpers::{
 use crate::document_core::DocumentCore;
 use crate::error::HwpError;
 use crate::model::event::DocumentEvent;
-use crate::renderer::composer::{reflow_line_segs, ParagraphBox};
+use crate::renderer::composer::{
+    paragraph_flow_end, recalculate_section_vpos, reflow_line_segs, ParagraphBox,
+};
 use crate::renderer::page_layout::PageLayoutInfo;
 use crate::renderer::style_resolver::{
     resolve_styles, resolve_styles_for_document, ResolvedStyleSet,
@@ -1025,30 +1027,8 @@ impl DocumentCore {
         // 텍스트 폭/높이에 영향을 주는 글자 모양 변경 시 LineSeg 재계산.
         // 장평/자간은 글꼴 크기처럼 줄나눔과 페이지네이션을 바꾼다.
         if char_shape_mods_affect_text_flow(&mods) {
-            let styles = resolve_styles_for_document(&self.document, self.dpi);
-            let section = &self.document.sections[sec_idx];
-            let page_def = &section.section_def.page_def;
-            let column_def = DocumentCore::find_initial_column_def(&section.paragraphs);
-            let layout = PageLayoutInfo::from_page_def(page_def, &column_def, self.dpi);
-            let col_width = layout
-                .column_areas
-                .first()
-                .map(|a| a.width)
-                .unwrap_or(layout.body_area.width);
-            let para_shape_id = self.document.sections[sec_idx].paragraphs[para_idx].para_shape_id;
-            let para_style = styles.para_styles.get(para_shape_id as usize);
-            // 본문: 열 상자.
-            let paragraph_box = ParagraphBox::body_for_style(col_width, para_style, self.dpi);
-            // 원본 LineSeg 무효화 → reflow가 max_font_size에서 새로 계산
-            self.document.sections[sec_idx].paragraphs[para_idx]
-                .line_segs
-                .clear();
-            reflow_line_segs(
-                &mut self.document.sections[sec_idx].paragraphs[para_idx],
-                paragraph_box,
-                &styles,
-                self.dpi,
-            );
+            // 줄 정보에는 저장 문서의 쪽/단 위치도 들어 있으므로 공통 재계산 경로를 쓴다.
+            self.reflow_body_paragraph(sec_idx, para_idx);
         }
 
         self.document.sections[sec_idx].raw_stream = None;
@@ -1092,28 +1072,13 @@ impl DocumentCore {
             )));
         }
 
-        let styles = resolve_styles_for_document(&self.document, self.dpi);
-        let available_box = {
-            let section = &self.document.sections[sec_idx];
-            let page_def = &section.section_def.page_def;
-            let column_def = DocumentCore::find_initial_column_def(&section.paragraphs);
-            let layout = PageLayoutInfo::from_page_def(page_def, &column_def, self.dpi);
-            let col_width = layout
-                .column_areas
-                .first()
-                .map(|a| a.width)
-                .unwrap_or(layout.body_area.width);
-            let para_shape_id = section.paragraphs[para_idx].para_shape_id;
-            let para_style = styles.para_styles.get(para_shape_id as usize);
-            // 본문: 열 상자.
-            ParagraphBox::body_for_style(col_width, para_style, self.dpi)
-        };
-
-        {
-            let para = &mut self.document.sections[sec_idx].paragraphs[para_idx];
-            para.apply_char_shape_range(start_offset, end_offset, char_shape_id);
-            reflow_line_segs(para, available_box, &styles, self.dpi);
-        }
+        self.document.sections[sec_idx].paragraphs[para_idx].apply_char_shape_range(
+            start_offset,
+            end_offset,
+            char_shape_id,
+        );
+        // 실행 취소도 서식 적용과 같은 위치 보정이 필요하다.
+        self.reflow_body_paragraph(sec_idx, para_idx);
 
         self.document.sections[sec_idx].raw_stream = None;
         self.rebuild_section(sec_idx);
@@ -1471,24 +1436,7 @@ impl DocumentCore {
         // 사용하므로). 줄간격뿐 아니라 여백/들여쓰기/줄나눔 단위도 사용 가능 폭·토큰
         // 경계를 바꾼다 — [#4324] para_shape_mods_affect_text_flow(:16 부근) 참고.
         if para_shape_mods_affect_text_flow(&mods) {
-            let styles = resolve_styles_for_document(&self.document, self.dpi);
-            let section = &self.document.sections[sec_idx];
-            let page_def = &section.section_def.page_def;
-            let column_def = DocumentCore::find_initial_column_def(&section.paragraphs);
-            let layout = PageLayoutInfo::from_page_def(page_def, &column_def, self.dpi);
-            let col_width = layout
-                .column_areas
-                .first()
-                .map(|a| a.width)
-                .unwrap_or(layout.body_area.width);
-            let para_style = styles.para_styles.get(new_id as usize);
-            // 본문: 열 상자.
-            reflow_line_segs(
-                &mut self.document.sections[sec_idx].paragraphs[para_idx],
-                ParagraphBox::body_for_style(col_width, para_style, self.dpi),
-                &styles,
-                self.dpi,
-            );
+            self.reflow_body_paragraph(sec_idx, para_idx);
         }
 
         self.document.sections[sec_idx].raw_stream = None;
@@ -1528,27 +1476,8 @@ impl DocumentCore {
             )));
         }
 
-        let styles = resolve_styles_for_document(&self.document, self.dpi);
-        let available_box = {
-            let section = &self.document.sections[sec_idx];
-            let page_def = &section.section_def.page_def;
-            let column_def = DocumentCore::find_initial_column_def(&section.paragraphs);
-            let layout = PageLayoutInfo::from_page_def(page_def, &column_def, self.dpi);
-            let col_width = layout
-                .column_areas
-                .first()
-                .map(|a| a.width)
-                .unwrap_or(layout.body_area.width);
-            let para_style = styles.para_styles.get(para_shape_id as usize);
-            // 본문: 열 상자.
-            ParagraphBox::body_for_style(col_width, para_style, self.dpi)
-        };
-
-        {
-            let para = &mut self.document.sections[sec_idx].paragraphs[para_idx];
-            para.para_shape_id = para_shape_id;
-            reflow_line_segs(para, available_box, &styles, self.dpi);
-        }
+        self.document.sections[sec_idx].paragraphs[para_idx].para_shape_id = para_shape_id;
+        self.reflow_body_paragraph(sec_idx, para_idx);
 
         self.document.sections[sec_idx].raw_stream = None;
         self.rebuild_section(sec_idx);
@@ -1842,29 +1771,39 @@ impl DocumentCore {
         base_psid
     }
 
-    /// 본문 문단의 LineSeg를 현재 CharShape/ParaShape 기준으로 다시 계산한다.
+    /// 본문 서식 변경 뒤 줄 크기와 후속 문단의 세로 위치를 함께 다시 계산한다.
+    ///
+    /// LineSeg를 먼저 지우면 문단 시작 위치가 0이 되어 쪽/단 경계로 오인된다.
+    /// 기존 첫 위치와 변경 전 끝 위치를 보존해야 실제 쪽 나눔과 편집에 따른
+    /// 높이 변화를 구별할 수 있다. 잘못된 문단 인덱스는 변경 없이 반환한다.
     pub(crate) fn reflow_body_paragraph(&mut self, sec_idx: usize, para_idx: usize) {
-        let para_shape_id = match self
+        let Some(para) = self
             .document
             .sections
             .get(sec_idx)
             .and_then(|s| s.paragraphs.get(para_idx))
-        {
-            Some(para) => para.para_shape_id,
-            None => return,
+        else {
+            return;
         };
+        let para_shape_id = para.para_shape_id;
+        let stored_end = paragraph_flow_end(para);
         let styles = resolve_styles_for_document(&self.document, self.dpi);
         let paragraph_box =
             body_paragraph_box_for_para_shape(self, sec_idx, para_shape_id, &styles);
-        if let Some(para) = self
-            .document
-            .sections
-            .get_mut(sec_idx)
-            .and_then(|s| s.paragraphs.get_mut(para_idx))
-        {
-            para.line_segs.clear();
-            reflow_line_segs(para, paragraph_box, &styles, self.dpi);
-        }
+        let hwp3_layout = self.document.layout_profile().hwp3_layout();
+        let paragraphs = &mut self.document.sections[sec_idx].paragraphs;
+        // reflow 자체가 새 글자 크기/폭을 반영하며, 기존 첫 줄의 위치는 유지한다.
+        reflow_line_segs(&mut paragraphs[para_idx], paragraph_box, &styles, self.dpi);
+        // 줄 수나 높이가 달라지면 뒤 문단도 이동하되 원래의 쪽/단 경계는 보존한다.
+        recalculate_section_vpos(
+            paragraphs,
+            para_idx,
+            None,
+            stored_end,
+            &styles,
+            self.dpi,
+            hwp3_layout,
+        );
     }
 
     /// 구역의 본문 문단 전부를 현재 용지/단 기준으로 다시 접는다 — 쪽 설정이 바뀌어 본문

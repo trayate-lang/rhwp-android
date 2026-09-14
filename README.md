@@ -1,3 +1,5 @@
+> **rHWP Fold Android Fork** — 오프라인 APK 구현·빌드·설치는 [Android 안내](rhwp-android/README.md), 실제 검사 상태는 [검증 기록](rhwp-android/VALIDATION.md)을 확인하세요. 통합 브랜치는 `android-main`입니다. 아래는 원본 프로젝트 안내입니다.
+
 <p align="center">
   <img src="assets/logo/logo-256.png" alt="rhwp logo" width="128" />
 </p>

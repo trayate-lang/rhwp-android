@@ -1,0 +1,89 @@
+name: Android offline build
+
+# 공개 Fork에서는 개인 서명키나 문서를 사용하지 않는다. APK 공개 배포도 수행하지 않는다.
+on:
+  push:
+    branches: [android-main, 'android/**']
+  pull_request:
+    branches: [android-main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 빌드·테스트 입력을 받는다. samples/hwpx는 Rust suite의 컴파일 시에도 참조된다.
+          sparse-checkout: |
+            src
+            crates
+            examples
+            tests
+            saved
+            bindings/Native
+            tools/rhwp-subsecond
+            tools/batch-convert
+            tools/llm_verifier/verdict_protocol
+            tools/llm_verifier/claim_bind
+            tools/llm_verifier/criteria_decomp
+            scripts
+            mydocs/manual
+            mydocs/tech/agent_roadmap
+            gym
+            npm
+            rhwp-shared
+            rhwp-studio
+            rhwp-android
+            assets/fonts
+            assets/logo
+            ttfs/opensource
+            samples/hml
+            samples/hwpx
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: rhwp-studio/package-lock.json
+      # 원본 CI가 고정한 설치 action을 재사용한다. 앱 엔진과 같은 Rust 버전이다.
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
+        with:
+          toolchain: '1.93.1'
+      - name: Stored document editing regression
+        run: |
+          node scripts/rust-test-suite-manifest.mjs --prepare
+          node scripts/run-rust-test.mjs --cargo-test android_formatting_page_flow -- --target-dir target/pr-review
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - run: npm ci --prefix rhwp-studio
+      - name: Same-source WASM
+        run: rhwp-android/scripts/build-wasm.sh
+      - name: Offline web bundle
+        run: rhwp-android/scripts/build-web.sh
+      - name: Studio tests
+        run: npm test --prefix rhwp-studio
+      - name: Android tests, lint, APK
+        working-directory: rhwp-android
+        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon --console=plain
+      - name: Test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-verification-reports
+          path: |
+            rhwp-android/app/build/reports/
+            rhwp-android/app/build/test-results/
+          retention-days: 14
+      # 설치용 APK는 로컬에서 개인 키로 서명한다. 공개 APK 업로드는 이후 단계다.

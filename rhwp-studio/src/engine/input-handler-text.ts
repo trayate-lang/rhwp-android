@@ -437,6 +437,8 @@ export function onCompositionEnd(this: any): void {
     clearCellBlockLetterImeFollowup.call(this);
     return;
   }
+  // 셀 블록 단축키의 정리는 먼저 수행한다. 이미 마감한 조합의 늦은 종료는 중복 기록하지 않는다.
+  if (!this.isComposing && !this.compositionAnchor) return;
 
   const anchor = this.compositionAnchor;
   const finalLength = this.compositionLength;
