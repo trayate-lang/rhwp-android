@@ -37,6 +37,8 @@ jobs:
             tools/llm_verifier/criteria_decomp
             scripts
             mydocs/manual
+            mydocs/tech/agent_roadmap
+            gym
             npm
             rhwp-shared
             rhwp-studio
