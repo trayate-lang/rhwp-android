@@ -115,6 +115,7 @@ const documentState = new DocumentDirtyState(eventBus);
 documentState.installBeforeUnload(window);
 const autosaveManager = new AutosaveManager({
   exportBytes: () => wasm.exportHwp(),
+  isDirty: () => documentState.isDirty(),
   // exportHwp()는 평문 HWP 바이트를 만든다. 보호 문서에서는 복구본을 남기지 않는다 (#5992).
   isRecoveryBlocked: () => wasm.requiresPasswordForSave,
   schedule: autosaveScheduleFromUserSettings(),
@@ -394,7 +395,7 @@ let autosavePreviousMessage: string | null = null;
 function autosaveScheduleFromUserSettings(): AutosaveScheduleSettings {
   const settings = userSettings.getAutosaveSettings();
   // 휴대폰은 백그라운드 종료가 잦으므로 입력이 멈춘 뒤 2초에 복구본을 남긴다.
-  if (getAndroidHost()) return { recoveryEnabled: true, recoveryIntervalMs: 60_000, idleEnabled: true, idleDelayMs: 2_000 };
+  if (getAndroidHost()) return { recoveryEnabled: true, recoveryIntervalMs: 15_000, idleEnabled: true, idleDelayMs: 2_000 };
   return {
     recoveryEnabled: settings.recoveryEnabled,
     recoveryIntervalMs: settings.recoveryIntervalMinutes * 60_000,
@@ -778,7 +779,8 @@ async function initialize(): Promise<void> {
     setupGlobalShortcuts();
     // 시작 진입점은 순서를 지켜야 한다 — ?url= 로드와 자동저장 복구가 문서를 열 기회를
     // 먼저 갖고, 아무도 열지 않았을 때만 빈 문서를 연다.
-    void (async () => {
+    // 복구 판단까지 초기화에 포함한다. Android 외부 열기가 복구 창과 경합하지 않게 한다.
+    await (async () => {
       await loadFromUrlParam();
       // embed 프로파일: 자동저장 복구 다이얼로그의 드래프트 복원도 호스트가 감지할 수
       // 없는 문서 교체 경로이므로 띄우지 않는다 (드래프트 기록 자체는 유지).
@@ -1680,8 +1682,11 @@ function shouldSkipInitialAutosaveRecovery(): boolean {
   return params.has('url');
 }
 
+// 같은 WebView 수명에서는 다시 묻지 않는다. 편집 중 생긴 새 복구본은 다음 실행의 대상이다.
+let initialRecoveryOffered = false;
 async function offerAutosaveRecoveryIfIdle(): Promise<void> {
-  if (shouldSkipInitialAutosaveRecovery()) return;
+  if (initialRecoveryOffered || shouldSkipInitialAutosaveRecovery()) return;
+  initialRecoveryOffered = true;
 
   try {
     const drafts = (await listAutosaveDrafts()).filter((draft) => draft.data.byteLength > 0);
@@ -1954,7 +1959,14 @@ installAndroidRuntime({
   },
   dispatch: id => { dispatcher.dispatch(id); },
   checkpoint: () => autosaveManager.flushNow('android-background'),
-  mayClose: async () => { await autosaveManager.flushNow('android-back'); return await confirmSaveBeforeReplacingDocument(commandServices); },
+  mayClose: async () => {
+    await autosaveManager.flushNow('android-back');
+    if (!await confirmSaveBeforeReplacingDocument(commandServices)) return false;
+    // 정상 종료를 승인한 저장/저장 안 함만 폐기한다. 취소·실패·강제 종료는 복구본을 보존한다.
+    documentState.markClean('android-normal-close');
+    await autosaveManager.discardCurrentDraft('android-normal-close');
+    return true;
+  },
   exportFile: () => {
     if (wasm.requiresPasswordForSave) throw new Error('암호 문서는 저장 기능으로 저장한 후 Android 파일 앱에서 공유해 주세요.');
     inputHandler?.flushDeferredPaginationIfNeeded('android-share', true);

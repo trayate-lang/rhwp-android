@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { InsertTextCommand, InsertLineBreakCommand, InsertTabCommand, SplitParagraphCommand, SplitParagraphInCellCommand, InsertTextInHeaderFooterCommand, SplitParagraphInHeaderFooterCommand, SplitParagraphInFootnoteCommand, DeleteTextInFootnoteCommand, MergeParagraphInFootnoteCommand, cellParaIndexOf } from './command';
+import { normalizeAutotextHtml } from '@/core/autotext-html';
 import { matchShortcut, defaultShortcuts } from '@/command/shortcut-map';
 import {
   resolveCellBlockCtrlShiftS,
@@ -766,7 +767,7 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
   if (dispatchCellBlockLetterShortcut.call(this, e)) return;
 
   // IME 조합 중 처리 (한국어 IME에서 e.key는 항상 'Process'이므로 e.code로 판별)
-  if (e.isComposing || e.keyCode === 229) {
+  if (this.isComposing || e.isComposing || e.keyCode === 229) {
     // [PR #786 후속] Ctrl+M chord 1번째/2번째 키 영역 영역 IME 합성 중 영역 영역도 활성화.
     // 한글 IME 영역 영역 e.key === 'Process' 영역 영역, e.code (KeyM/KeyN/KeyS/KeyF/KeyK 등) 영역 영역 판별.
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.code === 'KeyM') {
@@ -791,12 +792,13 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
         }
       }
     }
-    // 조합 중에도 e.code로 판별 가능한 기본 Ctrl/Meta 단축키는 일반 경로와 같은 dispatcher로 보낸다.
+    // 조합을 먼저 마감하고 Ctrl/Meta/Alt 명령을 한 번 실행한다(상용구·서식·저장 공통).
     // Ctrl+M chord는 위에서 먼저 소비하고, 매칭되지 않는 키는 기존 조합 처리로 계속 진행한다.
-    if ((e.ctrlKey || e.metaKey) && this.dispatcher) {
+    if ((e.ctrlKey || e.metaKey || e.altKey) && this.dispatcher) {
       const cmdId = matchShortcut(e, defaultShortcuts);
       if (cmdId) {
         e.preventDefault();
+        this.commitCompositionForCommand();
         this.dispatcher.dispatch(cmdId);
         return;
       }
@@ -1905,7 +1907,9 @@ export function onPaste(this: any, e: ClipboardEvent, forceExternal = false): vo
 
   const pos = this.cursor.getPosition();
   const clipboardData = e.clipboardData;
-  const html = clipboardData?.getData('text/html') || '';
+  const rawHtml = clipboardData?.getData('text/html') || '';
+  // 상용구 HTML 소스의 개행이 편집 문단의 실제 줄바꿈으로 들어가는 것을 막는다.
+  const html = forceExternal && rawHtml ? normalizeAutotextHtml(rawHtml) : rawHtml;
   const text = clipboardData?.getData('text/plain') || '';
   // HF는 이번 이슈에서 rich clipboard round-trip을 만들지 않는다. 내부 marker/HTML이
   // 있어도 시스템 plain text를 코어의 원자 범위 primitive로 삽입·치환한다.

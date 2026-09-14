@@ -409,3 +409,33 @@ test('AutosaveManager는 보호 해제 후 다시 draft를 저장한다', async 
   assert.equal(saved.length, 1);
   assert.equal(saved[0]?.id, 'draft-unprotected');
 });
+
+// 화면 전환과 종료가 저장된 문서를 다시 복구 후보로 만들던 실제 회귀를 검사한다.
+test('저장된 문서는 background checkpoint로 복구본을 만들지 않는다', async () => {
+  const { store, saved } = createStore();
+  let dirty = false;
+  const manager = new AutosaveManager({ exportBytes: () => new Uint8Array([1]), isDirty: () => dirty, store });
+  await manager.beginDocument({ fileName: 'clean.hwp', sourceFormat: 'hwp' });
+  await manager.flushNow('android-background');
+  assert.equal(saved.length, 0);
+  dirty = true;
+  await manager.flushNow('android-background');
+  assert.equal(saved.length, 1);
+  dirty = false;
+  await manager.flushNow('android-back');
+  assert.equal(saved.length, 1);
+  manager.dispose();
+});
+
+test('문서 전환 직전 진행 중인 저장은 이전 문서 복구본을 되살리지 않는다', async () => {
+  const { store, deleted } = createStore();
+  let finish!: () => void;
+  store.saveDraft = async () => await new Promise<void>(resolve => { finish = resolve; });
+  const manager = new AutosaveManager({ exportBytes: () => new Uint8Array([1]), store });
+  await manager.beginDocument({ fileName: 'a.hwp', sourceFormat: 'hwp', draftId: 'a' });
+  const saving = manager.flushNow();
+  await manager.beginDocument({ fileName: 'b.hwp', sourceFormat: 'hwp', draftId: 'b' }, { discardPreviousDraft: true });
+  finish(); await saving;
+  assert.ok(deleted.filter(id => id === 'a').length >= 2);
+  manager.dispose();
+});

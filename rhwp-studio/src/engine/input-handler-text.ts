@@ -433,6 +433,8 @@ export function onCompositionStart(this: any): void {
 }
 
 export function onCompositionEnd(this: any): void {
+  // 단축키의 blur/fallback이 이미 마감한 뒤 늦게 도착한 종료 이벤트는 기록을 중복하지 않는다.
+  if (!this.isComposing && !this.compositionAnchor) return;
   if (this._cellBlockLetterImeGuard?.consume('compositionend', this.textarea.value)) {
     clearCellBlockLetterImeFollowup.call(this);
     return;

@@ -33,6 +33,8 @@ export type AutosaveStatus =
 
 export interface AutosaveManagerOptions {
   exportBytes: () => Uint8Array;
+  /** 미저장 변경이 있을 때만 복구본을 만든다. 화면 전환 자체는 변경이 아니다. */
+  isDirty?: () => boolean;
   /**
    * 참이면 복구용 자동 저장을 수행하지 않는다. 보호 문서에서 평문 복구본이 남는 것을
    * 막기 위한 fail-closed 조건이다 (#5992).
@@ -63,6 +65,7 @@ function reasonText(reason: unknown, fallback: string): string {
 
 export class AutosaveManager {
   private readonly exportBytes: () => Uint8Array;
+  private readonly isDirty: () => boolean;
   private readonly isRecoveryBlocked: () => boolean;
   private readonly now: () => number;
   private readonly idFactory: () => string;
@@ -82,6 +85,7 @@ export class AutosaveManager {
 
   constructor(options: AutosaveManagerOptions) {
     this.exportBytes = options.exportBytes;
+    this.isDirty = options.isDirty ?? (() => true);
     this.isRecoveryBlocked = options.isRecoveryBlocked ?? (() => false);
     this.scheduleSettings = normalizeSchedule({
       recoveryEnabled: true,
@@ -126,6 +130,7 @@ export class AutosaveManager {
 
   async beginDocument(meta: AutosaveDocumentMeta, options: { discardPreviousDraft?: boolean } = {}): Promise<string> {
     const previousDraftId = this.current?.draftId ?? null;
+    this.discardGeneration += 1; // 이전 문서의 저장 완료가 새 문서 전환 뒤 복구본을 되살리지 못하게 한다.
     this.cancelTimers();
     this.pendingReason = null;
     this.lastSavedAt = 0;
@@ -159,7 +164,7 @@ export class AutosaveManager {
   }
 
   schedule(reason = 'document-mutated'): void {
-    if (!this.current) return;
+    if (!this.current || !this.isDirty()) return;
     const settings = this.scheduleSettings;
     if (!settings.recoveryEnabled && !settings.idleEnabled) return;
 
@@ -184,6 +189,10 @@ export class AutosaveManager {
   async flushNow(reason = 'manual'): Promise<void> {
     const current = this.current;
     if (!current) return;
+    if (!this.isDirty()) {
+      await this.discardCurrentDraft('document-clean');
+      return;
+    }
 
     if (this.isRecoveryBlocked()) {
       // 보호 문서의 평문 복구본을 만들지 않는다. 보호 상태로 바뀌기 전에 남은 draft가

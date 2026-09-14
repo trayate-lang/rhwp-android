@@ -1958,6 +1958,15 @@ export class InputHandler {
     _keyboard.onKeyDown.call(this, e);
   }
 
+  /** 단축키가 문서를 바꾸기 전에 현재 한글 조합을 기존 종료 경로로 확정한다. */
+  commitCompositionForCommand(): void {
+    if (!this.isComposing) return;
+    // blur는 Android IME에도 조합 종료를 알린다. 합성 이벤트 환경의 누락은 직접 마감한다.
+    this.textarea.blur();
+    if (this.isComposing) this.onCompositionEnd();
+    this.focusTextarea();
+  }
+
   /** Ctrl/Meta 단축키 처리 */
   private handleCtrlKey(e: KeyboardEvent): void {
     _keyboard.handleCtrlKey.call(this, e);

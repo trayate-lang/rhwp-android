@@ -9,6 +9,16 @@ import { EquationPropertiesDialog } from '@/ui/equation-props-dialog';
 import { TableCellPropsDialog } from '@/ui/table-cell-props-dialog';
 
 export const formatCommands: CommandDef[] = [
+  // 스타일 이름/ID를 고정하지 않는다. 사용자 문서의 스타일 목록 순서를 재사용한다.
+  ...Array.from({ length: 10 }, (_, index): CommandDef => ({
+    id: `format:style-${index + 1}`, label: `스타일 ${index + 1} 적용`,
+    shortcutLabel: `Ctrl+${(index + 1) % 10}`,
+    canExecute: ctx => ctx.hasDocument && ctx.isEditable,
+    execute(services) {
+      const style = services.wasm.getStyleList()[index];
+      if (style) services.getInputHandler()?.applyStyle(style.id);
+    },
+  })),
   {
     id: 'format:bold',
     label: '굵게',
