@@ -792,9 +792,10 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
         }
       }
     }
-    // 조합을 먼저 마감하고 Ctrl/Meta/Alt 명령을 한 번 실행한다(상용구·서식·저장 공통).
+    // 조합을 먼저 마감하고 수정키/기능키 명령을 한 번 실행한다(상용구·서식·저장 공통).
     // Ctrl+M chord는 위에서 먼저 소비하고, 매칭되지 않는 키는 기존 조합 처리로 계속 진행한다.
-    if ((e.ctrlKey || e.metaKey || e.altKey) && this.dispatcher) {
+    const isFunctionShortcut = /^F\d{1,2}$/i.test(e.code || e.key);
+    if ((e.ctrlKey || e.metaKey || e.altKey || isFunctionShortcut) && this.dispatcher) {
       const cmdId = matchShortcut(e, defaultShortcuts);
       if (cmdId) {
         e.preventDefault();

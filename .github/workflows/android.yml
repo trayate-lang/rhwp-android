@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # 빌드와 테스트의 공개 입력만 받는다. 원본의 대형 PDF 자료는 필요하지 않다.
+          # 빌드·테스트 입력을 받는다. samples/hwpx는 Rust suite의 컴파일 시에도 참조된다.
           sparse-checkout: |
             src
             crates
@@ -45,11 +45,20 @@ jobs:
             assets/logo
             ttfs/opensource
             samples/hml
+            samples/hwpx
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
           cache-dependency-path: rhwp-studio/package-lock.json
+      # 원본 CI가 고정한 설치 action을 재사용한다. 앱 엔진과 같은 Rust 버전이다.
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
+        with:
+          toolchain: '1.93.1'
+      - name: Stored document editing regression
+        run: |
+          node scripts/rust-test-suite-manifest.mjs --prepare
+          node scripts/run-rust-test.mjs --cargo-test android_formatting_page_flow -- --target-dir target/pr-review
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

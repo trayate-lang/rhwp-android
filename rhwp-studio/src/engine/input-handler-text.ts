@@ -433,12 +433,12 @@ export function onCompositionStart(this: any): void {
 }
 
 export function onCompositionEnd(this: any): void {
-  // 단축키의 blur/fallback이 이미 마감한 뒤 늦게 도착한 종료 이벤트는 기록을 중복하지 않는다.
-  if (!this.isComposing && !this.compositionAnchor) return;
   if (this._cellBlockLetterImeGuard?.consume('compositionend', this.textarea.value)) {
     clearCellBlockLetterImeFollowup.call(this);
     return;
   }
+  // 셀 블록 단축키의 정리는 먼저 수행한다. 이미 마감한 조합의 늦은 종료는 중복 기록하지 않는다.
+  if (!this.isComposing && !this.compositionAnchor) return;
 
   const anchor = this.compositionAnchor;
   const finalLength = this.compositionLength;

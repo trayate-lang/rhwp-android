@@ -61,3 +61,27 @@ JavaScript로 넣은 한글 문자열은 삼성 IME 조합 검사의 대체물�
 - assembleDebug/assembleRelease/lintDebug 성공. 폴드7 업데이트 설치 Success 및 versionName=0.1.3 확인.
 - 에뮬레이터는 연결되어 있지 않았다. 폴드7 화면 캡처는 알림 설정 화면이어서 아이콘 시각 검증 증거로 사용하지 않았다. 홈 화면에서 사용자의 최종 확인이 필요하다.
 - APK: outputs/rHWP-Fold-0.1.3.apk (Git 제외).
+
+## 0.1.4 편집·복구 회귀 검사 (2026-09-14)
+
+- 사용자 보고: 편집 중 복구 안내, 자간 단축키의 의도치 않은 쪽 나눔, 스타일 단축키 누락, 한글 조합 중 상용구와 추가 줄바꿈.
+- 수정 전 APK: `number-bullet.hwp`의 세 번째 문단을 선택하고 Alt+Shift+N을 누르면 1→2쪽. 실제 키 이벤트를 쓰는 `scripts/editing-regression-qa.mjs`에서 실패 확인.
+- 엔진 회귀 테스트 `android_formatting_page_flow`: 2개 통과. 공개 예제 3개 × 자간 ±1/장평 ±1 변경, HWP 저장·재열기·서식 복원, 스타일·줄 간격 변경 검사.
+- Rust 필수 검사: 포맷, native Clippy, WASM32 Clippy, workspace build, workspace all-target Clippy, 파생 suite 검사 모두 통과. 검토 작업트리의 소스와 검사 파일 해시 일치.
+- Studio/편집기 Node 24 테스트: 1,374 pass, 1 skip, 0 fail.
+- 최종 APK의 WebView 실제 조합 이벤트: Alt+I로 준말 치환, 추가 문단/개행 없음, undo/redo, 조합 중 Ctrl+2와 undo 순서 통과. 뒤늦은 compositionend/input에도 글자 중복 없음.
+- 최종 APK: 강제 종료 후 복구 창 1회 및 내용 복원, 16.5초 연속 입력 중 주기적 자동 저장, 종료 취소 시 수정 상태 유지, 저장 안 함으로 정상 종료 후 복구 창 없음, 깨끗한 문서 체크포인트 후 재시작에서 복구 창 없음 모두 통과.
+- 개인 문서는 사용하지 않았다. 공개 예제와 합성 문장만 사용하며 기기 주소는 기록하지 않는다.
+
+- 원본 전체 release-test: **8,927 pass / 46 skip / 0 fail** (nextest 실행 158.732초, 최초 컴파일 시간 별도).
+- Native Skia 3종: lib **4,128 pass / 13 ignored**, 이미지 placeholder 2개, direct PDF 4개 통과.
+- APK 작성 흐름: 기존 HWP 3종에서 Alt+Shift+N/W/J/K/E/R 및 undo 후 1/1/6쪽 유지. 새 문서 Ctrl+1..0도 문서의 스타일 ID 0..9와 일치.
+- 최종 APK 접기·펼치기 10회 및 이후 undo/redo: 내용·커서·확대·dirty·undo 유지 확인.
+- 추가 파생 결함: 조합 중 F7 쪽 설정이 열리지 않음을 수정 전 APK에서 확인. F6/F7도 조합 확정 후 실행하도록 보완하고 최종 APK에서 글자 보존·대화상자 열기/닫기 통과.
+- 기존 상용구 회귀: 글자·굵게 서식·표·그림의 다른 문서 삽입, undo/redo, Ctrl+F3 목록 모두 통과.
+- 실제 Android 저장창: 조합 중 Ctrl+S → 취소해도 글자·dirty 유지. HWP/HWPX 실제 저장 후 dirty=false, 저장 파일을 다시 읽어 1쪽 유지 및 마지막 조합 글자 보존 확인.
+- 시각 증거: 공개 `number-bullet.hwp`의 동일 문단 자간 변경을 Android 네이티브 화면으로 대조했다. 수정 전 1→2쪽, 수정 후 1쪽 유지 및 본문 위치 보존. 캡처는 공개 업로드하지 않고 로컬 `evidence/local/0.1.4/spacing-before.png`, `spacing-after.png`에 보관한다.
+- 빌드: 같은 소스 WASM, Studio 타입/번들, Android lint/unit/debug/release 및 개인 APK 서명 검증 통과.
+- APK: `outputs/rHWP-Fold-0.1.4.apk`, 63,081,795 bytes, SHA-256 `81ffed9a6827f2052c102e2f0100045e598dad3221d227d5d917386722e960ed`.
+- 새 회귀 검사: `scripts/editing-regression-qa.mjs` 다음 `scripts/recovery-regression-qa.mjs`를 전용 emulator-5554에 실행한다. 후자는 준비된 합성 문서만 강제 종료한다. `ADB`에 platform-tools/adb 경로를 지정할 수 있다.
+- 삼성 키보드·실물 폴드7의 0.1.4 검사는 연결 후 진행한다. WebView 조합 이벤트 검사는 삼성 IME 실기기 통과를 뜻하지 않는다.
