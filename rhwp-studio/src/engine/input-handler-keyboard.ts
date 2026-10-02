@@ -389,23 +389,6 @@ function positionAfterPasteResult(pos: DocumentPosition, parsed: any): DocumentP
   return newPos;
 }
 
-function pastePlainText(this: any, text: string, hasSelection: boolean): void {
-  if (hasSelection) {
-    this.deleteSelection({ deferRecord: true });
-  }
-  if (!text) return;
-
-  const lines = text.split(/\r?\n/);
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i]) {
-      this.executeOperation({ kind: 'command', command: new InsertTextCommand(this.cursor.getPosition(), lines[i]) });
-    }
-    if (i < lines.length - 1 && !this.cursor.isInCell()) {
-      this.executeOperation({ kind: 'command', command: new SplitParagraphCommand(this.cursor.getPosition()) });
-    }
-  }
-}
-
 export function prepareRhwpInternalClipboardHtml(self: any, html: string, text = ''): string {
   const token = createRhwpClipboardToken();
   self.rhwpClipboardToken = token;
@@ -2060,10 +2043,11 @@ export function onPaste(this: any, e: ClipboardEvent, forceExternal = false): vo
     return;
   }
 
-  // 영구 상용구 치환은 준말 삭제부터 여러 줄 삽입까지 하나의 스냅샷으로 기록한다.
-  // 일반 타이핑과 병합하면 Ctrl+Z가 준말까지 지워 버리므로 별도 경계가 필요하다.
-  if (forceExternal && text) {
-    this.executeOperation({ kind: 'snapshot', operationType: 'insertAutotext', operation: (wasm: WasmBridge) => {
+  // 상용구와 일반 텍스트 붙이기 모두 선택 삭제부터 여러 줄 삽입까지 한 번에 기록한다.
+  // 줄마다 기록하면 Undo가 마지막 줄만 지우고, 선택 교체 전의 글자는 복원하지 못한다.
+  // 빈 클립보드이면 선택 영역과 실행 취소 기록을 그대로 둔다.
+  if (text) {
+    this.executeOperation({ kind: 'snapshot', operationType: forceExternal ? 'insertAutotext' : 'pastePlainText', operation: (wasm: WasmBridge) => {
       if (hasSelection) this.deleteSelection({ deferRecord: true });
       let next = this.cursor.getPosition();
       const lines = text.split(/\r?\n/);
@@ -2075,8 +2059,6 @@ export function onPaste(this: any, e: ClipboardEvent, forceExternal = false): vo
     }});
     return;
   }
-  // 플레인 텍스트 붙여넣기 (fallback — 기존 InsertTextCommand 사용, 정밀 undo 유지)
-  pastePlainText.call(this, text, hasSelection);
 }
 
 /** 클립보드의 이미지 파일을 커서 위치에 삽입한다. */

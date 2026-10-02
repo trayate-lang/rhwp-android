@@ -85,3 +85,25 @@ JavaScript로 넣은 한글 문자열은 삼성 IME 조합 검사의 대체물�
 - APK: `outputs/rHWP-Fold-0.1.4.apk`, 63,081,795 bytes, SHA-256 `81ffed9a6827f2052c102e2f0100045e598dad3221d227d5d917386722e960ed`.
 - 새 회귀 검사: `scripts/editing-regression-qa.mjs` 다음 `scripts/recovery-regression-qa.mjs`를 전용 emulator-5554에 실행한다. 후자는 준비된 합성 문서만 강제 종료한다. `ADB`에 platform-tools/adb 경로를 지정할 수 있다.
 - 삼성 키보드·실물 폴드7의 0.1.4 검사는 연결 후 진행한다. WebView 조합 이벤트 검사는 삼성 IME 실기기 통과를 뜻하지 않는다.
+
+## 0.1.5 다른 앱 텍스트 붙여넣기 (2026-10-02)
+
+- 보고 경로: 삼성 노트에서 복사 → 본문 길게 누르기 → 붙이기. [Issue #3](https://github.com/trayate-lang/rhwp-android/issues/3), [PR #2](https://github.com/trayate-lang/rhwp-android/pull/2).
+- 수정 전 0.1.4: OS 클립보드에 합성 한글 두 줄이 있음을 읽어 확인했다. 실제 ADB 길게 누르기로 메뉴는 열렸지만 붙이기 후 본문은 비어 있었다. `document.execCommand('paste')`는 false를 반환했다.
+- 기존 Android `clipboardRead` 연결을 메뉴에 사용하고, 실제 텍스트를 기존 paste 처리기로 보낸다. 추가 검사에서 일반 텍스트 두 줄의 Undo가 마지막 줄만 지우는 문제도 발견하여, 기존 상용구의 스냅샷 기록 경로를 재사용했다.
+- 최종 후보 API 36 디버그 APK: 실제 OS 클립보드 → ADB 길게 누르기 → 메뉴 붙이기, 한글·여러 줄, 한 번의 Undo/Redo, 선택 교체 및 원문 복원, 오래된 내부 복사보다 새 외부 텍스트 우선 처리 통과.
+- 외부 키보드의 Ctrl+V가 보내는 원래 WebView paste 이벤트에서도 여러 줄 삽입과 한 번의 Undo 통과.
+- Chromium 한글 조합 마감 후 붙이기와 Undo, 빈 클립보드/양식 모드의 무변경, OS 읽기 실패 안내, 응답 대기 중 새 문서로 바뀌었을 때 삽입 취소 통과. 실패·지연 응답만 OS 연결 경계에서 대역으로 제공했고 실제 문서 엔진은 그대로 실행했다.
+- 기존 상용구 회귀: 다른 문서에서 글자·굵게·표·그림 삽입, Undo/Redo, Ctrl+F3 목록 통과.
+- Node 24: **1,374 pass / 1 skip / 0 fail**. Android 단위 검사 **12개**, lintDebug, Studio 타입/번들, debug/release 빌드 통과. Rust/WASM 소스는 변경하지 않았으며 기존 동일 소스 빌드 엔진을 사용했다.
+- 개인 APK: `outputs/rHWP-Fold-0.1.5.apk`, versionCode **6**, **63,081,967 bytes**. 서명 유효성과 0.1.4의 인증서 일치를 확인했다.
+- SHA-256: `d380eba40a45ece4dc120a116e16550d5daed9213955fc0a169eb4df0c3365d8`.
+- 실물 폴드7은 현재 ADB 미연결. **삼성 노트 앱 자체·삼성 키보드의 0.1.5 실기기 검사는 대기**다. 에뮬레이터는 합성 텍스트를 OS 클립보드에 넣어 동일한 수신 경로를 검증했다. 이 수정은 텍스트 붙여넣기이며 외부 글꼴·색·이미지 전달은 범위에 포함하지 않는다.
+
+재현 명령(전용 `emulator-5554`에 디버그 APK가 실행 중이어야 한다):
+
+```bash
+ADB="$ANDROID_HOME/platform-tools/adb" node rhwp-android/scripts/clipboard-qa.mjs
+```
+
+검사는 현재 문서를 합성 새 문서로 바꾸므로 개인 작업용 기기에는 실행하지 않는다. CDP의 합성 터치는 Android의 길게 누르기 메뉴를 생성하지 않아 실제 ADB 터치를 사용했다. 화면 좌표는 현재 WebView 경계와 문서 영역에서 계산한다.

@@ -51,6 +51,7 @@ import { showInitialCaretAndPublishFocus } from './initial-caret-focus';
 import { CaretLayoutReveal } from './caret-layout-reveal';
 import { emitHeaderFooterModeChanged } from './header-footer-mode';
 import { CellBlockLetterImeGuard } from '@/command/contextual-shortcut';
+import { getAndroidHost } from '@/platform/android-host';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const DRAG_SCROLL_EDGE_PX = 48;
@@ -317,6 +318,8 @@ export class InputHandler {
   private history: CommandHistory;
   private textarea: HTMLTextAreaElement;
   private active = false;
+  // 클립보드를 읽는 동안 문서가 바뀌면, 늦게 도착한 글을 새 문서에 넣지 않는다.
+  private clipboardDocumentGeneration = 0;
   private insertMode = true;  // true=삽입, false=수정(덮어쓰기)
   private editMode: EditorEditMode = 'normal';
   /** 마지막 셀 키 (눈금자 셀 bbox 중복 조회 방지) */
@@ -4181,6 +4184,7 @@ export class InputHandler {
   }
 
   deactivate(): void {
+    this.clipboardDocumentGeneration++;
     this.flushDeferredPaginationIfNeeded('before-deactivate', false);
     this.active = false;
     // 문서 교체와 mutation renderer 선택이 경합해 layout 완료 이벤트가 생략돼도
@@ -4229,6 +4233,7 @@ export class InputHandler {
   }
 
   dispose(): void {
+    this.clipboardDocumentGeneration++;
     this.flushDeferredPaginationIfNeeded('before-dispose', false);
     if (this.isResizeDragging) {
       this.cleanupResizeDrag();
@@ -5367,10 +5372,26 @@ export class InputHandler {
     _keyboard.onPaste.call(this, new ClipboardEvent('paste', { clipboardData: data }), true);
   }
 
-  performPaste(): boolean {
-    if (this.editMode === 'form') return false;
+  /** 메뉴 붙이기: Android는 OS 클립보드를 읽고 원본의 붙이기·실행 취소 경로를 재사용한다. */
+  async performPaste(): Promise<boolean> {
+    if (!this.active || this.editMode === 'form') return false;
     this.focusTextarea();
-    return document.execCommand('paste');
+    const host = getAndroidHost();
+    if (!host) return document.execCommand('paste');
+
+    // WebView는 execCommand('paste')를 거절하므로 기존 Kotlin 연결부로 읽는다.
+    // 빈 클립보드나 문서 전환은 무변경으로 끝내며, 읽기 실패는 호출한 UI에 전달한다.
+    const generation = this.clipboardDocumentGeneration;
+    const { text } = await host.call<{ text: string }>('clipboardRead');
+    if (!text || !this.active || this.isFormMode() || generation !== this.clipboardDocumentGeneration) return false;
+
+    this.commitCompositionForCommand();
+    const data = new DataTransfer();
+    data.setData('text/plain', text);
+    // clipboardData를 생략하면 오래된 내부 복사 버퍼가 선택될 수 있다.
+    // 실제 OS 텍스트를 넘겨 선택 교체·여러 문단 삽입·한 번의 Undo를 원본에 맡긴다.
+    this.onPaste(new ClipboardEvent('paste', { clipboardData: data }));
+    return true;
   }
 
   /** 잘라내기 (커맨드 시스템용 — 컨텍스트 메뉴/도구 상자에서 호출) */

@@ -15,8 +15,8 @@ android {
         applicationId = "io.github.trayate_lang.rhwp"
         minSdk = 30
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.1.4"
+        versionCode = 6
+        versionName = "0.1.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     if (signing.isNotEmpty()) signingConfigs.create("personal") {
