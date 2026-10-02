@@ -94,10 +94,13 @@ JavaScript로 넣은 한글 문자열은 삼성 IME 조합 검사의 대체물�
 - 최종 후보 API 36 디버그 APK: 실제 OS 클립보드 → ADB 길게 누르기 → 메뉴 붙이기, 한글·여러 줄, 한 번의 Undo/Redo, 선택 교체 및 원문 복원, 오래된 내부 복사보다 새 외부 텍스트 우선 처리 통과.
 - 외부 키보드의 Ctrl+V가 보내는 원래 WebView paste 이벤트에서도 여러 줄 삽입과 한 번의 Undo 통과.
 - Chromium 한글 조합 마감 후 붙이기와 Undo, 빈 클립보드/양식 모드의 무변경, OS 읽기 실패 안내, 응답 대기 중 새 문서로 바뀌었을 때 삽입 취소 통과. 실패·지연 응답만 OS 연결 경계에서 대역으로 제공했고 실제 문서 엔진은 그대로 실행했다.
+- 엔진 교체 직후·화면 초기화 이전의 지연 응답도 별도 재현했다. 초기 후보는 이때 새 문서에 글을 넣었고, 최종 후보는 원본 `wasm.documentGeneration`을 비교하여 삽입을 취소한다. 최종 APK에서 위 붙여넣기 전체 검사와 이 전환 검사가 모두 통과했다.
+- 붙여넣은 합성 문서로 에뮬레이터 접기·펼치기 10회 및 이후 Undo/Redo 통과. 문서·커서·확대·수정 상태·Undo 유지 확인.
 - 기존 상용구 회귀: 다른 문서에서 글자·굵게·표·그림 삽입, Undo/Redo, Ctrl+F3 목록 통과.
 - Node 24: **1,374 pass / 1 skip / 0 fail**. Android 단위 검사 **12개**, lintDebug, Studio 타입/번들, debug/release 빌드 통과. Rust/WASM 소스는 변경하지 않았으며 기존 동일 소스 빌드 엔진을 사용했다.
-- 개인 APK: `outputs/rHWP-Fold-0.1.5.apk`, versionCode **6**, **63,081,967 bytes**. 서명 유효성과 0.1.4의 인증서 일치를 확인했다.
-- SHA-256: `d380eba40a45ece4dc120a116e16550d5daed9213955fc0a169eb4df0c3365d8`.
+- 개인 APK: `outputs/rHWP-Fold-0.1.5.apk`, versionCode **6**, **63,081,955 bytes**. 서명 유효성과 0.1.4의 인증서 일치를 확인했다.
+- SHA-256: `965371bdced00a65ca9b0966373e117294ac2f691594ae943c530de28e56029e`.
+- GitHub 첫 실행은 SDK 준비 중 `Failed to find package 'tools'`로 실패했다. 앱 컴파일 전의 외부 설치 문제였으며, setup-android v3에 `packages: platform-tools`를 명시했다. 최신 Actions 상태는 PR #2에서 확인한다.
 - 실물 폴드7은 현재 ADB 미연결. **삼성 노트 앱 자체·삼성 키보드의 0.1.5 실기기 검사는 대기**다. 에뮬레이터는 합성 텍스트를 OS 클립보드에 넣어 동일한 수신 경로를 검증했다. 이 수정은 텍스트 붙여넣기이며 외부 글꼴·색·이미지 전달은 범위에 포함하지 않는다.
 
 재현 명령(전용 `emulator-5554`에 디버그 APK가 실행 중이어야 한다):

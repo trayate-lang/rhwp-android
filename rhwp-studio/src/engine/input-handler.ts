@@ -318,8 +318,6 @@ export class InputHandler {
   private history: CommandHistory;
   private textarea: HTMLTextAreaElement;
   private active = false;
-  // 클립보드를 읽는 동안 문서가 바뀌면, 늦게 도착한 글을 새 문서에 넣지 않는다.
-  private clipboardDocumentGeneration = 0;
   private insertMode = true;  // true=삽입, false=수정(덮어쓰기)
   private editMode: EditorEditMode = 'normal';
   /** 마지막 셀 키 (눈금자 셀 bbox 중복 조회 방지) */
@@ -4184,7 +4182,6 @@ export class InputHandler {
   }
 
   deactivate(): void {
-    this.clipboardDocumentGeneration++;
     this.flushDeferredPaginationIfNeeded('before-deactivate', false);
     this.active = false;
     // 문서 교체와 mutation renderer 선택이 경합해 layout 완료 이벤트가 생략돼도
@@ -4233,7 +4230,6 @@ export class InputHandler {
   }
 
   dispose(): void {
-    this.clipboardDocumentGeneration++;
     this.flushDeferredPaginationIfNeeded('before-dispose', false);
     if (this.isResizeDragging) {
       this.cleanupResizeDrag();
@@ -5381,9 +5377,10 @@ export class InputHandler {
 
     // WebView는 execCommand('paste')를 거절하므로 기존 Kotlin 연결부로 읽는다.
     // 빈 클립보드나 문서 전환은 무변경으로 끝내며, 읽기 실패는 호출한 UI에 전달한다.
-    const generation = this.clipboardDocumentGeneration;
+    // 원본 엔진의 세대를 재사용한다. 화면 초기화 전이라도 문서가 교체되면 즉시 달라진다.
+    const generation = this.wasm.documentGeneration;
     const { text } = await host.call<{ text: string }>('clipboardRead');
-    if (!text || !this.active || this.isFormMode() || generation !== this.clipboardDocumentGeneration) return false;
+    if (!text || !this.active || !this.textarea.isConnected || this.isFormMode() || generation !== this.wasm.documentGeneration) return false;
 
     this.commitCompositionForCommand();
     const data = new DataTransfer();

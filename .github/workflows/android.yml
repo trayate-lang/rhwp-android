@@ -66,6 +66,10 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          # Google이 제공을 중단한 옛 tools 패키지를 기본값으로 요청하지 않는다.
+          # sdkmanager는 action의 cmdline-tools 설치에 포함된다.
+          packages: platform-tools
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - run: npm ci --prefix rhwp-studio
       - name: Same-source WASM

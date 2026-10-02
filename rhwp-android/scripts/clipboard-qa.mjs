@@ -162,6 +162,26 @@ try {
   assert.equal(await documentText(), '');
   await page.evaluate(() => window.__restoreClipboardTransport());
   console.log('클립보드 응답 전 문서 전환: 새 문서에 잘못 붙이지 않음 통과');
+
+  // 새 문서의 엔진은 화면 초기화보다 먼저 교체된다. 그 짧은 사이의 응답도 취소해야 한다.
+  await page.evaluate(() => {
+    const native = window.RhwpNative;
+    const original = native.postMessage.bind(native);
+    window.__restoreClipboardTransport = () => { native.postMessage = original; };
+    native.postMessage = message => {
+      const request = JSON.parse(message);
+      if (request.method !== 'clipboardRead') return original(message);
+      window.__releaseClipboard = () => native.onmessage({ data: JSON.stringify({ id: request.id, result: { text: '화면 초기화 전의 지연된 붙이기' } }) });
+    };
+    window.__pendingClipboardPaste = window.__clipboardQA.getInputHandler().performPaste();
+    window.__clipboardQA.wasm.createNewDocument();
+    window.__releaseClipboard();
+  });
+  assert.equal(await page.evaluate(() => window.__pendingClipboardPaste), false);
+  assert.equal(await documentText(), '');
+  await page.evaluate(() => window.__restoreClipboardTransport());
+  await fresh();
+  console.log('엔진 교체 직후·화면 초기화 전에도 지연된 붙이기 취소 통과');
 } finally {
   // 검사 중 단언이 실패해도 OS 경계 대역을 남기지 않는다.
   if (page) await page.evaluate(() => window.__restoreClipboardTransport?.()).catch(() => {});

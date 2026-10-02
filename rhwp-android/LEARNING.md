@@ -76,4 +76,8 @@ GitHub의 첫 Rust 회귀 검사에서는 CLI에 포함되는 설명 문서 두 
 
 비동기 응답은 새 문서가 열린 뒤 도착할 수 있다. 요청 시점의 문서 세대 번호를 저장하고 응답 때 비교한다. 번호가 다르면 삽입하지 않는다. 검색창에서 이전 검색 결과가 새 검색 결과를 덮어쓰지 않게 하는 처리에도 같은 원리를 쓴다.
 
+세대 번호도 원본 엔진의 `documentGeneration`을 재사용한다. 별도로 화면 초기화 때 번호를 올리면, 엔진이 새 문서로 바뀌었지만 화면은 아직 초기화 중인 짧은 구간을 놓친다. 그 구간에서 지연 응답을 주는 검사로 실패를 재현한 뒤 원본의 문서 교체 시점에 맞췄다. 상태의 기준은 가능한 한 실제 데이터를 소유한 곳에 둔다.
+
 [Issue #3](https://github.com/trayate-lang/rhwp-android/issues/3)에 증상과 재현을, [PR #2](https://github.com/trayate-lang/rhwp-android/pull/2)에 수정 코드를 연결한다. 로컬 Commit은 작업 기록, GitHub 게시(Push)는 그 기록의 공유, Actions는 별도 컴퓨터에서의 빌드 확인이다. 에뮬레이터에서 성공해도 삼성 노트와 삼성 키보드의 실물 확인을 완료로 표시하지 않는다.
+
+2026-10-02에는 현재 터미널 인증으로 `git push origin HEAD:android/offline-editor`가 성공했다. 과거 인증의 제한을 현재에도 그대로 적용하지 않고 실제 권한과 결과를 다시 확인한 사례다. 이후 Actions는 앱 컴파일 전에 Android SDK의 옛 `tools` 패키지를 찾지 못해 실패했다. [제작자 안내](https://github.com/android-actions/setup-android#the-deprecated-tools-package)와 v3의 원본 설정을 확인하고 `packages: platform-tools`를 지정했다. 외부 설치 대상이 바뀐 환경 문제는 앱 코드의 오류와 나누어 고친다.
