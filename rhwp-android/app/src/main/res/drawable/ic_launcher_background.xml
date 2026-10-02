@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 적응형 아이콘의 배경: 런처 마스크 밖까지 채워 가장자리에 빈틈이 생기지 않는다. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient android:type="radial" android:centerX="0.5" android:centerY="0.4"
+        android:gradientRadius="76dp" android:startColor="#124CE0" android:centerColor="#09287E" android:endColor="#06133E" />
+</shape>

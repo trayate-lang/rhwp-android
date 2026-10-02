@@ -1,0 +1,9 @@
+<resources>
+    <!-- 화면 여백은 WindowInsets로 관리해 시스템바와 키보드에 가리지 않게 한다. -->
+    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#2563EB</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

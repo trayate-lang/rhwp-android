@@ -45,8 +45,17 @@ export class MenuBar {
     for (const item of this.menuItems) {
       const title = item.querySelector('.menu-title') as HTMLElement;
       if (!title) continue;
-      title.addEventListener('mousedown', (e) => {
+      // 터치를 합성 mousedown까지 기다리지 않고 처리한다. preventDefault는
+      // 뒤따르는 마우스 이벤트의 중복 실행과 입력칸 재활성화를 막는다.
+      title.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
         e.preventDefault();
+        // 문서 커서/선택은 엔진에 보관되어 있다. Android 메뉴 조작 중에는
+        // 숨겨진 입력칸의 포커스만 해제하여 소프트 키보드가 올라오지 않게 한다.
+        if (document.documentElement.classList.contains('rhwp-android')) {
+          const active = document.activeElement;
+          if (active instanceof HTMLElement) active.blur();
+        }
         if (this.openMenu === item) {
           this.closeAll();
         } else {
@@ -65,7 +74,9 @@ export class MenuBar {
     for (const item of this.menuItems) {
       const title = item.querySelector('.menu-title') as HTMLElement;
       if (!title) continue;
-      title.addEventListener('mouseenter', () => {
+      title.addEventListener('pointerenter', (e) => {
+        // 터치의 합성 hover가 기존 메뉴를 먼저 바꾸면 뒤의 토글이 닫아 버린다.
+        if (e.pointerType !== 'mouse') return;
         if (this.openMenu && this.openMenu !== item) {
           this.openMenu.classList.remove('open');
           item.classList.add('open');
@@ -101,7 +112,7 @@ export class MenuBar {
 
   /** 바깥 클릭 → 닫기 */
   private setupOutsideClose(): void {
-    document.addEventListener('mousedown', (e) => {
+    document.addEventListener('pointerdown', (e) => {
       if (!this.openMenu) return;
       if (!this.container.contains(e.target as Node)) {
         this.closeAll();

@@ -132,7 +132,7 @@ test('InputHandler는 IME보다 먼저 Ctrl/Cmd+Shift+S와 수정자 없는 S/M�
   );
   const contextual = source.indexOf('dispatchCellBlockCtrlShiftS.call(this, e)');
   const cellLetters = source.indexOf('dispatchCellBlockLetterShortcut.call(this, e)');
-  const ime = source.indexOf('if (e.isComposing || e.keyCode === 229) {');
+  const ime = source.indexOf('if (this.isComposing || e.isComposing || e.keyCode === 229) {');
 
   assert.ok(contextual >= 0, '셀 블록 문맥 단축키 호출이 있어야 한다');
   assert.ok(cellLetters > contextual, 'Ctrl/Cmd+Shift+S 뒤에 수정자 없는 S/M을 판정해야 한다');
@@ -185,7 +185,7 @@ test('Recovery R1: 물리 S/M 셀 명령은 IME 조기 반환보다 먼저 처�
     'utf8',
   );
   const contextual = source.indexOf('dispatchCellBlockLetterShortcut.call(this, e)');
-  const ime = source.indexOf('if (e.isComposing || e.keyCode === 229) {');
+  const ime = source.indexOf('if (this.isComposing || e.isComposing || e.keyCode === 229) {');
 
   assert.ok(contextual >= 0, '셀 블록 S/M 문맥 단축키 호출이 있어야 한다');
   assert.ok(ime > contextual, '한글 IME 조기 반환보다 먼저 S/M을 처리해야 한다');

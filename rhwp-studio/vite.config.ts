@@ -20,6 +20,8 @@ const useSubsecondWasm = process.env.RHWP_SUBSECOND === '1';
  * `studio-plugin` 청크 자체가 남지 않는다. studio 만 떼어 배포할 때 쓴다.
  */
 const withHwpctrl = process.env.RHWP_WITHOUT_HWPCTRL !== '1';
+// APK는 모든 자산을 포함한다. 웹 서비스 워커의 이전 버전 캐시/온라인 갱신을 사용하지 않는다.
+const androidBuild = process.env.RHWP_ANDROID === '1';
 
 export default defineConfig({
   define: {
@@ -109,7 +111,7 @@ export default defineConfig({
         });
       },
     },
-    VitePWA({
+    !androidBuild && VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'icons/*.png'],
       manifest: {

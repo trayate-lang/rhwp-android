@@ -6,6 +6,7 @@ import { HistoryDialog } from '@/ui/history-dialog';
 import { CompareDialog } from '@/ui/compare-dialog';
 import { CompareSessionStore } from '@/compare/session';
 import { canExecuteFormatPaste } from '../format-paste-availability';
+import { showToast } from '@/ui/toast';
 
 /** 검색 대화상자 싱글톤 — 열려 있으면 재사용 */
 let findDialogInstance: FindDialog | null = null;
@@ -64,7 +65,10 @@ export const editCommands: CommandDef[] = [
     shortcutLabel: 'Ctrl+V',
     canExecute: (ctx) => ctx.hasDocument && !ctx.isFormMode,
     execute(services) {
-      services.getInputHandler()?.performPaste();
+      // Android 클립보드 응답은 비동기다. 실패를 무시하지 않고 다시 복사하도록 안내한다.
+      void services.getInputHandler()?.performPaste().catch(() => {
+        showToast({ message: '붙여넣지 못했습니다. 원래 앱에서 텍스트를 다시 복사한 뒤 시도해 주세요.', durationMs: 5000 });
+      });
     },
   },
   {

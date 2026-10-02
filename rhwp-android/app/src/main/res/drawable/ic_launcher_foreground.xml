@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 생성 시안의 문서/ㅎ를 벡터로 재구성한다. 중심 여백은 원형·삼성 마스크를 위한 공간이다. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- 은은한 그림자로 배경과 종이를 구분한다. -->
+    <path android:fillColor="#28000000" android:pathData="M37,26H62L80,44V78Q80,86 72,86H37Q29,86 29,78V34Q29,26 37,26Z" />
+    <path android:pathData="M37,24H61L78,41V76Q78,83 71,83H37Q30,83 30,76V31Q30,24 37,24Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="30" android:startY="24" android:endX="78" android:endY="83">
+                <item android:offset="0" android:color="#FFFFFF" />
+                <item android:offset="1" android:color="#F0F1F7" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- 종이 접힘의 아래 그림자와 파란 면: Fold의 접힘을 시각적으로 표현한다. -->
+    <path android:fillColor="#19001751" android:pathData="M61,25L78,42V46H67Q60,46 60,39V25Z" />
+    <path android:pathData="M61,24L78,41H67Q61,41 61,35Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="61" android:startY="24" android:endX="78" android:endY="41">
+                <item android:offset="0" android:color="#448BFF" />
+                <item android:offset="1" android:color="#084AF5" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- 글꼴 파일에 의존하지 않는 ㅎ: 짧은 획, 긴 획, 원을 직접 그린다. -->
+    <path android:fillColor="#081C54" android:pathData="M49,42H59Q60,42 60,43V45Q60,46 59,46H49Q48,46 48,45V43Q48,42 49,42Z M43,48H65Q66,48 66,49V51Q66,52 65,52H43Q42,52 42,51V49Q42,48 43,48Z" />
+    <path android:fillColor="#081C54" android:fillType="evenOdd"
+        android:pathData="M54,54A10,9 0,1 1,54,72A10,9 0,1 1,54,54Z M54,58.5A4.5,4.5 0,1 0,54,67.5A4.5,4.5 0,1 0,54,58.5Z" />
+    <path android:fillColor="#1459FF" android:pathData="M41,75H67Q68.5,75 68.5,76.5Q68.5,78 67,78H41Q39.5,78 39.5,76.5Q39.5,75 41,75Z" />
+</vector>

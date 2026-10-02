@@ -1,4 +1,7 @@
 import { WasmBridge } from '@/core/wasm-bridge';
+import { getAndroidHost } from '@/platform/android-host';
+import { prepareAndroidHost, installAndroidRuntime } from '@/platform/android-runtime';
+import '@/styles/android.css';
 import type { DocumentInfo, PageInfo } from '@/core/types';
 import { EventBus } from '@/core/event-bus';
 import { assertRemoteDocumentBytes } from '@/core/document-signature';
@@ -104,12 +107,15 @@ import type { EmbedRendererRuntimeRequestV1 } from '@/embed/rpc-router';
 import { enrichFontDecisionTrace } from '@/core/font-decision-trace';
 import { DocumentAgentController } from '@/document-agent/controller';
 
+// WASM 초기화 전에 파일 선택 인터페이스를 준비한다. 일반 웹에서는 아무 것도 변경하지 않는다.
+prepareAndroidHost();
 const wasm = new WasmBridge();
 const eventBus = new EventBus();
 const documentState = new DocumentDirtyState(eventBus);
 documentState.installBeforeUnload(window);
 const autosaveManager = new AutosaveManager({
   exportBytes: () => wasm.exportHwp(),
+  isDirty: () => documentState.isDirty(),
   // exportHwp()는 평문 HWP 바이트를 만든다. 보호 문서에서는 복구본을 남기지 않는다 (#5992).
   isRecoveryBlocked: () => wasm.requiresPasswordForSave,
   schedule: autosaveScheduleFromUserSettings(),
@@ -388,6 +394,8 @@ let autosavePreviousMessage: string | null = null;
 
 function autosaveScheduleFromUserSettings(): AutosaveScheduleSettings {
   const settings = userSettings.getAutosaveSettings();
+  // 휴대폰은 백그라운드 종료가 잦으므로 입력이 멈춘 뒤 2초에 복구본을 남긴다.
+  if (getAndroidHost()) return { recoveryEnabled: true, recoveryIntervalMs: 15_000, idleEnabled: true, idleDelayMs: 2_000 };
   return {
     recoveryEnabled: settings.recoveryEnabled,
     recoveryIntervalMs: settings.recoveryIntervalMinutes * 60_000,
@@ -771,7 +779,8 @@ async function initialize(): Promise<void> {
     setupGlobalShortcuts();
     // 시작 진입점은 순서를 지켜야 한다 — ?url= 로드와 자동저장 복구가 문서를 열 기회를
     // 먼저 갖고, 아무도 열지 않았을 때만 빈 문서를 연다.
-    void (async () => {
+    // 복구 판단까지 초기화에 포함한다. Android 외부 열기가 복구 창과 경합하지 않게 한다.
+    await (async () => {
       await loadFromUrlParam();
       // embed 프로파일: 자동저장 복구 다이얼로그의 드래프트 복원도 호스트가 감지할 수
       // 없는 문서 교체 경로이므로 띄우지 않는다 (드래프트 기록 자체는 유지).
@@ -1673,8 +1682,11 @@ function shouldSkipInitialAutosaveRecovery(): boolean {
   return params.has('url');
 }
 
+// 같은 WebView 수명에서는 다시 묻지 않는다. 편집 중 생긴 새 복구본은 다음 실행의 대상이다.
+let initialRecoveryOffered = false;
 async function offerAutosaveRecoveryIfIdle(): Promise<void> {
-  if (shouldSkipInitialAutosaveRecovery()) return;
+  if (initialRecoveryOffered || shouldSkipInitialAutosaveRecovery()) return;
+  initialRecoveryOffered = true;
 
   try {
     const drafts = (await listAutosaveDrafts()).filter((draft) => draft.data.byteLength > 0);
@@ -1936,6 +1948,35 @@ const initPromise = initialize();
 void initPromise.then(() => {
   if (!rendererInitialized) return;
   maybeShowSkinOnboarding();
+});
+
+installAndroidRuntime({
+  // 원본 초기화는 오류를 화면에 표시하고 resolve하므로 실제 렌더러 준비까지 확인한다.
+  ready: initPromise.then(() => { if (getAndroidHost() && !rendererInitialized) throw new Error('편집기를 초기화하지 못했습니다. 앱을 다시 실행해 주세요.'); }),
+  open: async (file, handle) => {
+    if (!await canReplaceCurrentDocument(false)) return;
+    await loadBytes(new Uint8Array(await file.arrayBuffer()), file.name, handle);
+  },
+  dispatch: id => { dispatcher.dispatch(id); },
+  checkpoint: () => autosaveManager.flushNow('android-background'),
+  mayClose: async () => {
+    await autosaveManager.flushNow('android-back');
+    if (!await confirmSaveBeforeReplacingDocument(commandServices)) return false;
+    // 정상 종료를 승인한 저장/저장 안 함만 폐기한다. 취소·실패·강제 종료는 복구본을 보존한다.
+    documentState.markClean('android-normal-close');
+    await autosaveManager.discardCurrentDraft('android-normal-close');
+    return true;
+  },
+  exportFile: () => {
+    if (wasm.requiresPasswordForSave) throw new Error('암호 문서는 저장 기능으로 저장한 후 Android 파일 앱에서 공유해 주세요.');
+    inputHandler?.flushDeferredPaginationIfNeeded('android-share', true);
+    const hwpx = wasm.getSourceFormat() === 'hwpx';
+    const artifact = hwpx ? wasm.exportHwpxWithReport() : wasm.exportHwpWithReport();
+    // 손실이 보고된 결과를 공유창으로 곧바로 넘기지 않는다. 원본 저장 흐름에서 고지를 확인한다.
+    if (artifact.contentLoss.count > 0) throw new Error('변환 중 보존되지 않는 내용이 있습니다. 먼저 저장 메뉴에서 손실 안내를 확인해 주세요.');
+    return { bytes: artifact.bytes, name: (wasm.fileName || 'document').replace(/\.(hwp|hwpx|hml)$/i, '') + (hwpx ? '.hwpx' : '.hwp'), protected: false };
+  },
+  report: message => showToast({ message, durationMs: 5000 }),
 });
 
 installEmbedRuntime({

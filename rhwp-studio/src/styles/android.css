@@ -1,0 +1,16 @@
+/* Android 전용 버튼/여백. 문서 DOM을 교체하지 않고 창 크기만 바꾼다. */
+.rhwp-android body { padding-bottom: 44px; box-sizing: border-box; }
+.rhwp-android #studio-root { height: calc(100dvh - 44px); }
+.rhwp-android-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; height: 44px;
+  display: flex; align-items: stretch; justify-content: space-around;
+  background: var(--bg-primary, #fff); color: var(--text-primary, #172b4d);
+  border-top: 1px solid #a9b8cc; z-index: 80;
+}
+.rhwp-android-bar button { flex: 1; border: 0; background: transparent; color: inherit; font: 14px system-ui; min-width: 48px; }
+.rhwp-android-bar button:active { background: #dce8fa; }
+.rhwp-android-help { max-width: min(560px, 90vw); max-height: 80vh; overflow: auto; border: 1px solid #8095b1; border-radius: 12px; }
+.rhwp-android-help p { white-space: pre-line; line-height: 1.6; }
+.rhwp-android-help button { min-height: 48px; min-width: 80px; }
+@media (pointer: coarse) { .rhwp-android input, .rhwp-android select { font-size: 16px; } }
+@media print { .rhwp-android-bar { display: none; } }

@@ -116,3 +116,17 @@ test('기본 도구 상자 접기/펴기는 한컴 호환 Ctrl/Command+F1로 매
   assert.equal(command({ key: 'f1', metaKey: true }, 'mac'), 'view:toolbox-basic');
   assert.equal(command({ key: 'F1' }), null);
 });
+
+test('문서 스타일 1부터 10까지 숫자와 IME 물리 키를 같은 명령에 연결한다', () => {
+  for (let i = 1; i <= 10; i++) {
+    assert.equal(command({ key: String(i % 10), ctrlKey: true }), `format:style-${i}`);
+    assert.equal(command({ key: 'Process', code: `Digit${i % 10}`, ctrlKey: true }), `format:style-${i}`);
+  }
+});
+
+test('한글 조합 중 저장·찾기·글자 서식·상용구도 물리 키로 찾는다', () => {
+  for (const [code, commandId] of [['KeyS','file:save'], ['KeyF','edit:find'], ['KeyB','format:bold'], ['KeyI','format:italic']]) {
+    assert.equal(command({ key: 'Process', code, ctrlKey: true }), commandId);
+  }
+  assert.equal(command({ key: 'Process', code: 'KeyI', altKey: true }), 'insert:autotext');
+});
